@@ -35,4 +35,4 @@ Requires Pub+ API credentials and endpoint configuration for successful data ret
 
 ---
 
-For internal use only
+For company internal use only
