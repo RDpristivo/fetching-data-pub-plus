@@ -7,8 +7,10 @@ from csv_handler import process_campaigns_data, save_to_csv
 from drive_handler import get_google_drive_service, create_folder_if_not_exists, upload_csv_to_drive
 
 def main():
-    # Initialize Google Drive service
-    drive_service = get_google_drive_service()
+    print("Starting campaign data collection...")
+    
+    # Initialize Google Drive and Sheets services
+    drive_service, sheets_service = get_google_drive_service()
     
     # Create or get the main campaign_data folder in Google Drive
     drive_folder_id = create_folder_if_not_exists(drive_service, 'campaign_data')
@@ -54,8 +56,9 @@ def main():
         
         # Upload to Google Drive
         try:
-            file_id = upload_csv_to_drive(drive_service, filename, drive_folder_id)
-            print(f"File uploaded to Google Drive with ID: {file_id}")
+            print(f"Uploading data to Google Drive...")
+            file_id = upload_csv_to_drive(drive_service, sheets_service, filename, drive_folder_id)
+            print(f"Data successfully updated in Google Drive spreadsheet with ID: {file_id}")
         except Exception as e:
             print(f"Error uploading to Google Drive: {e}")
     else:
