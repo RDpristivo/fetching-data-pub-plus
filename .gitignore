@@ -4,6 +4,16 @@ credentials.json
 token.pickle
 .env
 
+# Security and Credentials
+credentials/
+*credentials*.json
+*token*.json
+*token*.pickle
+client_secrets.json
+service-account.json
+*.key
+*.pem
+
 # Python
 __pycache__/
 *.py[cod]
