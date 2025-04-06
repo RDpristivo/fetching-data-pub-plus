@@ -1,5 +1,7 @@
+import os
 import pandas as pd
 import json
+from datetime import datetime, timedelta
 
 def process_campaigns_data(data):
     """
@@ -38,16 +40,80 @@ def process_campaigns_data(data):
     
     return campaigns_list
 
+def load_existing_csv(filename):
+    """
+    Load existing CSV file into a pandas DataFrame
+    If file doesn't exist, return empty DataFrame with the exact required header columns
+    """
+    try:
+        return pd.read_csv(filename)
+    except FileNotFoundError:
+        return pd.DataFrame(columns=[
+            "date",
+            "feed",
+            "campaign_id",
+            "status",
+            "daily_budget",
+            "activation_date",
+            "revenue",
+            "page_views",
+            "visits",
+            "clicks",
+            "roi",
+            "cost_per_click",
+            "profit",
+            "bid_strategy",
+            "learning_stage_info",
+            "site_name",
+            "results",
+            "results_rate",
+            "ads_status",
+            "keyword_impressions",
+            "searches",
+            "visit_roi",
+            "fetched_timestamp"
+        ])
+
 def save_to_csv(data, filename):
     """
-    Function to save data to a CSV file
+    Function to save or update data in a CSV file
     """
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    
     if not data or len(data) == 0:
         print(f"No data to save for {filename}")
         return
+
+    # Convert new data to DataFrame and add timestamp
+    new_df = pd.DataFrame(data)
+    new_df['fetched_timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    new_df['feed'] = 'pubplus'  # Add feed column with default value
+
+    # Load existing data (will have proper header if file exists)
+    existing_df = load_existing_csv(filename)
+
+    # Create a unique key from date and campaign_id for update detection.
+    new_df['unique_key'] = new_df['date'].astype(str) + '_' + new_df['campaign_id'].astype(str)
+    if not existing_df.empty:
+        existing_df['unique_key'] = existing_df['date'].astype(str) + '_' + existing_df['campaign_id'].astype(str)
+
+    # Remove existing rows that are being updated in new_df (same date and campaign_id)
+    if not existing_df.empty:
+        existing_df = existing_df[~existing_df['unique_key'].isin(new_df['unique_key'])]
+
+    # Combine existing and new data
+    combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+    combined_df.drop(columns='unique_key', inplace=True)
+
+    # Sort by date and campaign_id as needed
+    combined_df.sort_values(by=['date', 'campaign_id'], inplace=True)
     
-    df = pd.DataFrame(data)
-    df.to_csv(filename, index=False)
-    print(f"Data saved to {filename}")
-    print(f"Saved {len(data)} campaigns with {len(df.columns)} columns")
-    print(f"First few columns: {', '.join(list(df.columns)[:5])}")
+    # Filter to keep only rows from the last 30 days
+    cutoff_date = datetime.now() - timedelta(days=29)
+    combined_df['date'] = pd.to_datetime(combined_df['date'], errors='coerce')
+    combined_df = combined_df[combined_df['date'] >= cutoff_date]
+    combined_df['date'] = combined_df['date'].dt.strftime('%Y-%m-%d')
+    
+    # Save the combined data with the exact header columns as required.
+    combined_df.to_csv(filename, index=False)
