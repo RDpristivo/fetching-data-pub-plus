@@ -2,6 +2,7 @@
 campaign_data/
 credentials.json
 token.pickle
+.env
 
 # Python
 __pycache__/
