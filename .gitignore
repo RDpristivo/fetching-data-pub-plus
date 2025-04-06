@@ -1,5 +1,7 @@
 # Campaign data directory
 campaign_data/
+credentials.json
+token.pickle
 
 # Python
 __pycache__/
