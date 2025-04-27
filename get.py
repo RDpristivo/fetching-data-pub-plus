@@ -14,11 +14,13 @@ def get_campaign_data(start_date, end_date):
     
     headers = {
         'accept': 'application/json, text/plain, */*',
-        'authorization': 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NDM2ODk0MDUsImV4cCI6MTc0NDg5OTAwNSwiYXV0aF9zZWNyZXQiOiIwZTA3MzU1YWY1MTAwZjliNGU4NmFkN2E4NTE1Zjk5ZTIwNWVkOTBkNmZkNzE0YjdkMmMxZWRkODI5OTY1NzIyNjJlZTZmYzk5NWIwYWRjZTY5NGNiMjk5NTU1OGExYjljNjJkMmJhYThkYzExMjNhOGRkOTJkMjZlNzlkNWE2OCJ9.xg9h8kA1FIZeQSgRg01uuekaLiJVNbtdtObRYtYBSaQ',
+        'authorization': 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NDUxMzA5MjgsImV4cCI6MTc0NjM0MDUyOCwiYXV0aF9zZWNyZXQiOiI3OTkzZjcyOTc0YTA0MGZhMmUzMmFmYzI5YjVlMmQyY2M2YjIxZWYxNGU2MTQ1OGU0YTIyZjMxYjA4ZTkzMzcwOTc3MzA3YTg3ZjJhNTA5NjEzMTlkNjM1ZjIwNmE0NmMzNzRhNjY0MmM0NDM5MTM1MjdkYTFmYmE1NDYyOTRlMSJ9.B5nhW32_a7reARCp1jzcXJhyUS7Z5BivIlVQmVTl6Wo',
         'origin': 'https://app.pubplus.com',
         'x-pp-client-id': '65629304-8517-4d74-8416-3d796ce34a3a',
         'x-pp-git-version': 'd0ab415798491ee742976775e3214bceb1f1bb27'
     }
+
+    
     
     response = requests.get(url, params=params, headers=headers)
     
