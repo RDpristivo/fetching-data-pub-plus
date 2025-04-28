@@ -125,59 +125,13 @@ def find_spreadsheet(drive_service, file_name, folder_id):
     # Normalize the file name - remove .csv extension and trim spaces
     original_file_name = file_name
     file_name = file_name.replace(".csv", "").strip()
+    print(f"DEBUG: Normalized file name: {file_name}")
 
     print(f"Searching for file named '{file_name}' in folder ID: {folder_id}")
 
     try:
-        # First try: Exact match (case-sensitive)
-        exact_query = f"name='{file_name}' and '{folder_id}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
-
-        results = (
-            drive_service.files()
-            .list(
-                q=exact_query,
-                spaces="drive",
-                fields="files(id, name)",
-                orderBy="modifiedTime desc",
-            )
-            .execute()
-        )
-
-        files = results.get("files", [])
-
-        if files:
-            print(
-                f"Found existing spreadsheet: {files[0]['name']} (ID: {files[0]['id']})"
-            )
-            return files[0]
-
-        # Second try: Case-insensitive search
-        print(f"No exact match found. Trying case-insensitive search...")
-        case_insensitive_query = f"name contains '{file_name}' and '{folder_id}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
-
-        results = (
-            drive_service.files()
-            .list(
-                q=case_insensitive_query,
-                spaces="drive",
-                fields="files(id, name)",
-                orderBy="modifiedTime desc",
-            )
-            .execute()
-        )
-
-        files = results.get("files", [])
-
-        # Filter for exact name (case-insensitive)
-        exact_matches = [f for f in files if f["name"].lower() == file_name.lower()]
-        if exact_matches:
-            print(
-                f"Found case-insensitive match: {exact_matches[0]['name']} (ID: {exact_matches[0]['id']})"
-            )
-            return exact_matches[0]
-
-        # Third try: List all spreadsheets in the folder for debugging and potential matches
-        print(f"No case-insensitive match. Retrieving all spreadsheets in folder...")
+        # First: List ALL spreadsheets in the folder to ensure we can see everything
+        print(f"DEBUG: Retrieving all spreadsheets in folder {folder_id}...")
         all_files_query = f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
 
         results = (
@@ -194,22 +148,47 @@ def find_spreadsheet(drive_service, file_name, folder_id):
         all_files = results.get("files", [])
 
         if all_files:
-            print(f"Found {len(all_files)} spreadsheets in the folder:")
+            print(f"DEBUG: Found {len(all_files)} spreadsheets in the folder:")
             for f in all_files:
                 print(f"  - {f['name']} (ID: {f['id']})")
 
-            # Look for files with similar names (partial matches)
+            # First try: Look for exact filename match
             for f in all_files:
-                # Check if our filename is in the spreadsheet name or vice versa
-                if (
-                    file_name.lower() in f["name"].lower()
-                    or f["name"].lower() in file_name.lower()
-                    or
-                    # Also check with original filename (with .csv)
-                    original_file_name.lower() in f["name"].lower()
-                ):
-                    print(f"Found similar match: {f['name']} (ID: {f['id']})")
+                if f["name"].lower() == file_name.lower():
+                    print(
+                        f"Found exact match (case-insensitive): {f['name']} (ID: {f['id']})"
+                    )
                     return f
+
+            # Second try: Look for filename without .csv extension
+            clean_name = file_name.lower()
+            for f in all_files:
+                clean_file = f["name"].lower().replace(".csv", "").strip()
+                if clean_file == clean_name:
+                    print(f"Found match after cleaning: {f['name']} (ID: {f['id']})")
+                    return f
+
+            # Third try: Check if file name contains our search term or vice versa
+            for f in all_files:
+                if (
+                    clean_name in f["name"].lower()
+                    or f["name"].lower() in clean_name
+                    or original_file_name.lower() in f["name"].lower()
+                ):
+                    print(f"Found partial match: {f['name']} (ID: {f['id']})")
+                    return f
+
+            # Special case for "pubplus_campaign_data"
+            if "pubplus_campaign_data" in clean_name:
+                for f in all_files:
+                    if (
+                        "pubplus" in f["name"].lower()
+                        and "campaign" in f["name"].lower()
+                    ):
+                        print(
+                            f"Found special pubplus match: {f['name']} (ID: {f['id']})"
+                        )
+                        return f
 
         print(f"No existing spreadsheet found with name '{file_name}'")
         return None
@@ -236,12 +215,11 @@ def find_spreadsheet(drive_service, file_name, folder_id):
         except Exception as recovery_error:
             print(f"Recovery attempt failed: {recovery_error}")
 
-        return None
-
 
 def upload_csv_to_drive(drive_service, sheets_service, file_path, folder_id):
     """Upload CSV data to Google Drive as a spreadsheet, updating if exists"""
     file_name = os.path.basename(file_path)
+    print(f"DEBUG: Normalized file name: {file_name.replace('.csv', '')}")
 
     # If Sheets API is not available, fall back to simple file replacement
     if not sheets_service:
@@ -307,100 +285,159 @@ def upload_csv_to_drive(drive_service, sheets_service, file_path, folder_id):
                 .get(spreadsheetId=spreadsheet_id)
                 .execute()
             )
+
+            # DEBUG: Print all available sheet names
+            print("DEBUG: Available sheets in this spreadsheet:")
+            for sheet in sheet_metadata["sheets"]:
+                print(
+                    f"  - {sheet['properties']['title']} (Sheet ID: {sheet['properties']['sheetId']})"
+                )
+
+            # Use the first sheet or look for one with a matching name
             sheet_title = sheet_metadata["sheets"][0]["properties"]["title"]
+
+            # Try to find a sheet with a name matching our file (without extension)
+            clean_filename = file_name.replace(".csv", "").strip()
+            for sheet in sheet_metadata["sheets"]:
+                if sheet["properties"]["title"].lower() == clean_filename.lower():
+                    sheet_title = sheet["properties"]["title"]
+                    break
+
             print(f"Reading data from sheet: {sheet_title}")
 
-            sheet_data = (
-                sheets_service.spreadsheets()
-                .values()
-                .get(spreadsheetId=spreadsheet_id, range=sheet_title)
-                .execute()
-            )
+            try:
+                # Try to get the sheet data
+                sheet_data = (
+                    sheets_service.spreadsheets()
+                    .values()
+                    .get(spreadsheetId=spreadsheet_id, range=sheet_title)
+                    .execute()
+                )
 
-            if "values" in sheet_data and len(sheet_data["values"]) > 1:
-                print(f"Found {len(sheet_data['values']) - 1} rows of existing data")
-
-                # Convert Google Sheet data to DataFrame
-                existing_headers = sheet_data["values"][0]
-                existing_data = sheet_data["values"][1:]
-
-                # Handle empty cells in the data
-                for row in existing_data:
-                    while len(row) < len(existing_headers):
-                        row.append("")
-
-                existing_df = pd.DataFrame(existing_data, columns=existing_headers)
-
-                # Convert date strings to datetime for comparison
-                if "date" in existing_df.columns and "date" in new_data_df.columns:
-                    existing_df["date"] = pd.to_datetime(
-                        existing_df["date"], errors="coerce"
-                    )
-                    new_data_df["date"] = pd.to_datetime(
-                        new_data_df["date"], errors="coerce"
+                if "values" in sheet_data and len(sheet_data["values"]) > 1:
+                    print(
+                        f"Found {len(sheet_data['values']) - 1} rows of existing data"
                     )
 
-                # Create unique keys for identifying unique rows
-                if (
-                    "campaign_id" in existing_df.columns
-                    and "campaign_id" in new_data_df.columns
-                ):
-                    existing_df["unique_key"] = (
-                        existing_df["date"].astype(str)
-                        + "_"
-                        + existing_df["campaign_id"].astype(str)
-                    )
-                    new_data_df["unique_key"] = (
-                        new_data_df["date"].astype(str)
-                        + "_"
-                        + new_data_df["campaign_id"].astype(str)
-                    )
+                    # Convert Google Sheet data to DataFrame
+                    existing_headers = sheet_data["values"][0]
+                    existing_data = sheet_data["values"][1:]
 
-                    # Remove rows from existing data that will be updated
-                    merged_df = pd.concat(
-                        [
-                            existing_df[
-                                ~existing_df["unique_key"].isin(
-                                    new_data_df["unique_key"]
-                                )
-                            ],
-                            new_data_df,
-                        ]
-                    )
-                    merged_df = merged_df.drop(columns=["unique_key"])
+                    # Handle empty cells in the data
+                    for row in existing_data:
+                        while len(row) < len(existing_headers):
+                            row.append("")
 
-                    # Convert dates back to string format
-                    if "date" in merged_df.columns:
-                        merged_df["date"] = merged_df["date"].dt.strftime("%Y-%m-%d")
+                    existing_df = pd.DataFrame(existing_data, columns=existing_headers)
 
-                    print(f"Merged data has {len(merged_df)} rows")
+                    # Process the data as before...
+                    # (Keeping the existing merging logic)
 
-                    # Sort by date and campaign_id
+                    # Convert date strings to datetime for comparison
+                    if "date" in existing_df.columns and "date" in new_data_df.columns:
+                        existing_df["date"] = pd.to_datetime(
+                            existing_df["date"], errors="coerce"
+                        )
+                        new_data_df["date"] = pd.to_datetime(
+                            new_data_df["date"], errors="coerce"
+                        )
+
+                    # Create unique keys for identifying unique rows
                     if (
-                        "date" in merged_df.columns
-                        and "campaign_id" in merged_df.columns
+                        "campaign_id" in existing_df.columns
+                        and "campaign_id" in new_data_df.columns
                     ):
-                        merged_df = merged_df.sort_values(["date", "campaign_id"])
+                        existing_df["unique_key"] = (
+                            existing_df["date"].astype(str)
+                            + "_"
+                            + existing_df["campaign_id"].astype(str)
+                        )
+                        new_data_df["unique_key"] = (
+                            new_data_df["date"].astype(str)
+                            + "_"
+                            + new_data_df["campaign_id"].astype(str)
+                        )
 
-                    # Prepare data for uploading - ensure all values are JSON-safe
-                    values = [merged_df.columns.tolist()]
-                    for _, row in merged_df.iterrows():
+                        # Remove rows from existing data that will be updated
+                        merged_df = pd.concat(
+                            [
+                                existing_df[
+                                    ~existing_df["unique_key"].isin(
+                                        new_data_df["unique_key"]
+                                    )
+                                ],
+                                new_data_df,
+                            ]
+                        )
+                        merged_df = merged_df.drop(columns=["unique_key"])
+
+                        # Convert dates back to string format
+                        if "date" in merged_df.columns:
+                            merged_df["date"] = merged_df["date"].dt.strftime(
+                                "%Y-%m-%d"
+                            )
+
+                        print(f"Merged data has {len(merged_df)} rows")
+
+                        # Sort by date and campaign_id
+                        if (
+                            "date" in merged_df.columns
+                            and "campaign_id" in merged_df.columns
+                        ):
+                            merged_df = merged_df.sort_values(["date", "campaign_id"])
+
+                        # Prepare data for uploading - ensure all values are JSON-safe
+                        values = [merged_df.columns.tolist()]
+                        for _, row in merged_df.iterrows():
+                            # Convert each value to string if not empty
+                            cleaned_row = [
+                                str(val) if val != "" else "" for val in row.tolist()
+                            ]
+                            values.append(cleaned_row)
+
+                        # Clear the sheet first
+                        clear_request = (
+                            sheets_service.spreadsheets()
+                            .values()
+                            .clear(spreadsheetId=spreadsheet_id, range=sheet_title)
+                        )
+                        clear_request.execute()
+                        print(f"Cleared existing data from sheet")
+
+                        # Then update with new data
+                        update_request = (
+                            sheets_service.spreadsheets()
+                            .values()
+                            .update(
+                                spreadsheetId=spreadsheet_id,
+                                range=f"{sheet_title}!A1",
+                                valueInputOption="RAW",
+                                body={"values": values},
+                            )
+                        )
+                        response = update_request.execute()
+                        print(
+                            f"Updated {response.get('updatedCells')} cells in the spreadsheet"
+                        )
+
+                        return spreadsheet_id
+                    else:
+                        print("Missing required columns to identify unique rows")
+                else:
+                    print(
+                        "Sheet exists but has no data or only headers - will update with new data"
+                    )
+
+                    # Prepare data for uploading directly from the new CSV
+                    values = [new_data_df.columns.tolist()]
+                    for _, row in new_data_df.iterrows():
                         # Convert each value to string if not empty
                         cleaned_row = [
                             str(val) if val != "" else "" for val in row.tolist()
                         ]
                         values.append(cleaned_row)
 
-                    # Clear the sheet first
-                    clear_request = (
-                        sheets_service.spreadsheets()
-                        .values()
-                        .clear(spreadsheetId=spreadsheet_id, range=sheet_title)
-                    )
-                    clear_request.execute()
-                    print(f"Cleared existing data from sheet")
-
-                    # Then update with new data
+                    # Update the existing sheet
                     update_request = (
                         sheets_service.spreadsheets()
                         .values()
@@ -413,14 +450,42 @@ def upload_csv_to_drive(drive_service, sheets_service, file_path, folder_id):
                     )
                     response = update_request.execute()
                     print(
-                        f"Updated {response.get('updatedCells')} cells in the spreadsheet"
+                        f"Updated empty sheet with {response.get('updatedCells')} cells"
                     )
-
                     return spreadsheet_id
-                else:
-                    print("Missing required columns to identify unique rows")
-            else:
-                print("No values found in existing sheet or header only")
+
+            except Exception as sheet_error:
+                print(f"Error reading sheet data: {sheet_error}")
+                # Instead of immediately falling back to creating a new file,
+                # we can try updating the sheet directly
+                try:
+                    print("Trying to update sheet directly...")
+                    values = [new_data_df.columns.tolist()]
+                    for _, row in new_data_df.iterrows():
+                        cleaned_row = [
+                            str(val) if val != "" else "" for val in row.tolist()
+                        ]
+                        values.append(cleaned_row)
+
+                    # Update the existing sheet
+                    update_request = (
+                        sheets_service.spreadsheets()
+                        .values()
+                        .update(
+                            spreadsheetId=spreadsheet_id,
+                            range=f"{sheet_title}!A1",
+                            valueInputOption="RAW",
+                            body={"values": values},
+                        )
+                    )
+                    response = update_request.execute()
+                    print(
+                        f"Direct update successful with {response.get('updatedCells')} cells"
+                    )
+                    return spreadsheet_id
+                except Exception as direct_update_error:
+                    print(f"Direct update failed: {direct_update_error}")
+
         except Exception as e:
             print(f"Error updating existing spreadsheet: {e}")
             print("Falling back to file replacement method")
@@ -447,5 +512,3 @@ def upload_csv_to_drive(drive_service, sheets_service, file_path, folder_id):
 
     print(f"Created new spreadsheet: {file['name']} (ID: {file['id']})")
     return file["id"]
-
-    # Last Commit | Working
