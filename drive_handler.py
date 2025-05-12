@@ -8,12 +8,53 @@ import os
 import pickle
 import pandas as pd
 import time
+import threading
+import subprocess
+import platform
+from dotenv import load_dotenv
+from twilio_utils import send_notification_with_fallback
+
+# Load environment variables
+load_dotenv()
 
 # Update scopes to include both Drive and Sheets APIs
 SCOPES = [
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/spreadsheets",
 ]
+
+# Increased timeout values
+SOCKET_TIMEOUT = 120  # seconds
+API_TIMEOUT = 300  # seconds
+
+
+def close_browser_tab():
+    """Function to close the browser tab after authentication"""
+
+    def _close_tab():
+        # Wait for authentication to complete
+        time.sleep(10)
+
+        # For Windows
+        if platform.system() == "Windows":
+            try:
+                subprocess.run(["taskkill", "/F", "/IM", "chrome.exe"], check=False)
+                print("Closed Chrome browser on Windows")
+            except Exception as e:
+                print(f"Failed to close Chrome on Windows: {e}")
+
+        # For macOS
+        elif platform.system() == "Darwin":
+            try:
+                os.system('pkill -a "Google Chrome"')
+                print("Closed Chrome browser on macOS")
+            except Exception as e:
+                print(f"Failed to close Chrome on macOS: {e}")
+
+    # Start thread to close browser
+    thread = threading.Thread(target=_close_tab)
+    thread.daemon = True
+    thread.start()
 
 
 def get_google_drive_service():
@@ -31,22 +72,27 @@ def get_google_drive_service():
                 flow = InstalledAppFlow.from_client_secrets_file(
                     "credentials.json", SCOPES, redirect_uri="http://localhost:8080/"
                 )
+
+                # Start the thread to close the browser tab
+                close_browser_tab()
+
                 creds = flow.run_local_server(
                     port=8080,
                     success_message="Authentication successful! You can close this window.",
                     open_browser=True,
+                    timeout_seconds=180,  # Increase timeout for slow VMs
                 )
             except Exception as e:
-                print(f"Authentication error: {e}")
+                error_message = f"Authentication error: {e}"
+                print(error_message)
                 print(
                     "Please make sure you've added http://localhost:8080/ to your OAuth 2.0 Client authorized redirect URIs"
                 )
+                send_notification_with_fallback(f"ERROR: {error_message}")
                 raise
 
         with open("token.pickle", "wb") as token:
             pickle.dump(creds, token)
-
-    drive_service = build("drive", "v3", credentials=creds)
 
     # Add retry logic for Sheets API
     sheets_service = None
@@ -57,7 +103,11 @@ def get_google_drive_service():
         try:
             sheets_service = build("sheets", "v4", credentials=creds)
             # Test the service with a simple call
-            sheets_service.spreadsheets().get(spreadsheetId="dummy").execute()
+            try:
+                sheets_service.spreadsheets().get(spreadsheetId="dummy").execute()
+            except:
+                # Expected to fail with 404, but confirms API is working
+                pass
             break
         except HttpError as e:
             if "SERVICE_DISABLED" in str(e):
@@ -77,16 +127,15 @@ def get_google_drive_service():
                 print("2. Click 'Enable API'")
                 print("3. Wait a few minutes for the changes to take effect")
                 print("4. Run this script again\n")
-            elif "404" in str(e) and "Requested entity was not found" in str(e):
-                # This is expected - the API is working but the 'dummy' spreadsheet doesn't exist
-                # Consider the API to be working correctly and continue
-                break
-            else:
-                print(f"Warning: Sheets API initialization failed: {e}")
+                send_notification_with_fallback(
+                    "ERROR: Google Sheets API is not enabled!"
+                )
+            break
         except Exception as e:
             print(f"Warning: Unexpected error with Sheets API: {e}")
             break
 
+    drive_service = build("drive", "v3", credentials=creds)
     return drive_service, sheets_service
 
 
@@ -125,13 +174,10 @@ def find_spreadsheet(drive_service, file_name, folder_id):
     # Normalize the file name - remove .csv extension and trim spaces
     original_file_name = file_name
     file_name = file_name.replace(".csv", "").strip()
-    print(f"DEBUG: Normalized file name: {file_name}")
-
-    print(f"Searching for file named '{file_name}' in folder ID: {folder_id}")
+    print(f"ℹ️ Searching for file '{file_name}' in Google Drive folder")
 
     try:
-        # First: List ALL spreadsheets in the folder to ensure we can see everything
-        print(f"DEBUG: Retrieving all spreadsheets in folder {folder_id}...")
+        # First: List ALL spreadsheets in the folder with increased timeouts
         all_files_query = f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
 
         results = (
@@ -141,23 +187,20 @@ def find_spreadsheet(drive_service, file_name, folder_id):
                 spaces="drive",
                 fields="files(id, name)",
                 orderBy="modifiedTime desc",
+                pageSize=100,  # Increase page size to get more results
             )
-            .execute()
+            .execute(num_retries=5)  # Add retries for reliability
         )
 
         all_files = results.get("files", [])
 
         if all_files:
-            print(f"DEBUG: Found {len(all_files)} spreadsheets in the folder:")
-            for f in all_files:
-                print(f"  - {f['name']} (ID: {f['id']})")
+            print(f"ℹ️ Found {len(all_files)} spreadsheets in the folder")
 
             # First try: Look for exact filename match
             for f in all_files:
                 if f["name"].lower() == file_name.lower():
-                    print(
-                        f"Found exact match (case-insensitive): {f['name']} (ID: {f['id']})"
-                    )
+                    print(f"✅ Found exact match: {f['name']} (ID: {f['id']})")
                     return f
 
             # Second try: Look for filename without .csv extension
@@ -165,7 +208,7 @@ def find_spreadsheet(drive_service, file_name, folder_id):
             for f in all_files:
                 clean_file = f["name"].lower().replace(".csv", "").strip()
                 if clean_file == clean_name:
-                    print(f"Found match after cleaning: {f['name']} (ID: {f['id']})")
+                    print(f"✅ Found match after cleaning: {f['name']} (ID: {f['id']})")
                     return f
 
             # Third try: Check if file name contains our search term or vice versa
@@ -175,7 +218,7 @@ def find_spreadsheet(drive_service, file_name, folder_id):
                     or f["name"].lower() in clean_name
                     or original_file_name.lower() in f["name"].lower()
                 ):
-                    print(f"Found partial match: {f['name']} (ID: {f['id']})")
+                    print(f"✅ Found partial match: {f['name']} (ID: {f['id']})")
                     return f
 
             # Special case for "pubplus_campaign_data"
@@ -186,329 +229,129 @@ def find_spreadsheet(drive_service, file_name, folder_id):
                         and "campaign" in f["name"].lower()
                     ):
                         print(
-                            f"Found special pubplus match: {f['name']} (ID: {f['id']})"
+                            f"✅ Found PubPlus campaign data file: {f['name']} (ID: {f['id']})"
                         )
                         return f
 
-        print(f"No existing spreadsheet found with name '{file_name}'")
+        # File not found - send notification and return None
+        error_message = f"❌ PubPlus data file not found in Google Drive: '{file_name}'"
+        print(error_message)
+        send_notification_with_fallback(f"ALERT: {error_message}")
         return None
 
     except Exception as e:
-        print(f"Error searching for spreadsheet: {e}")
+        print(f"❌ Error searching for spreadsheet: {e}")
         # Attempt a basic recovery with a simpler query
         try:
-            print("Attempting recovery with basic folder query...")
+            print("ℹ️ Attempting recovery with basic folder query...")
             basic_query = f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
 
             results = (
                 drive_service.files()
-                .list(q=basic_query, spaces="drive", fields="files(id, name)")
-                .execute()
+                .list(
+                    q=basic_query,
+                    spaces="drive",
+                    fields="files(id, name)",
+                    pageSize=100,
+                )
+                .execute(num_retries=5)  # More retries for recovery
             )
 
             all_files = results.get("files", [])
             if all_files:
                 for f in all_files:
                     if file_name.lower() in f["name"].lower():
-                        print(f"Recovery found potential match: {f['name']}")
+                        print(f"✅ Recovery found potential match: {f['name']}")
                         return f
+
+            # If we reach here, recovery failed as well
+            error_message = f"❌ PubPlus data file not found in Google Drive (after recovery attempt)"
+            print(error_message)
+            send_notification_with_fallback(f"ALERT: {error_message}")
+
         except Exception as recovery_error:
-            print(f"Recovery attempt failed: {recovery_error}")
+            error_message = f"❌ Failed to find PubPlus data file: {recovery_error}"
+            print(error_message)
+            send_notification_with_fallback(f"ALERT: {error_message}")
+
+        return None
 
 
 def upload_csv_to_drive(drive_service, sheets_service, file_path, folder_id):
     """Upload CSV data to Google Drive as a spreadsheet, updating if exists"""
     file_name = os.path.basename(file_path)
-    print(f"DEBUG: Normalized file name: {file_name.replace('.csv', '')}")
 
-    # If Sheets API is not available, fall back to simple file replacement
-    if not sheets_service:
-        print(
-            "\nFalling back to simple file replacement since Sheets API is not available"
-        )
-        print(
-            "Note: This will not preserve any formatting or formulas in existing sheets"
-        )
-        existing_file = find_spreadsheet(drive_service, file_name, folder_id)
-
-        if existing_file:
-            try:
-                drive_service.files().delete(fileId=existing_file["id"]).execute()
-                print(f"Deleted existing file: {existing_file['name']}")
-            except Exception as e:
-                print(f"Warning: Could not delete existing file: {e}")
-
-        # Create new file
-        media = MediaFileUpload(file_path, mimetype="text/csv", resumable=True)
-        file_metadata = {
-            "name": file_name,
-            "parents": [folder_id],
-            "mimeType": "application/vnd.google-apps.spreadsheet",
-        }
-
-        try:
-            file = (
-                drive_service.files()
-                .create(
-                    body=file_metadata,
-                    media_body=media,
-                    fields="id, name",
-                    supportsAllDrives=True,
-                )
-                .execute()
-            )
-            print(
-                f"Successfully created new spreadsheet: {file['name']} (ID: {file['id']})"
-            )
-            return file["id"]
-        except Exception as e:
-            print(f"Error creating new spreadsheet: {e}")
-            raise
-
-    # Load new CSV data and clean NaN values
+    # Load CSV data
     new_data_df = pd.read_csv(file_path)
-    # Replace NaN values with empty string for JSON compatibility
-    new_data_df = new_data_df.fillna("")
-    print(f"Loaded {len(new_data_df)} rows of new data from {file_path}")
+    new_data_df = new_data_df.fillna("")  # Replace NaN values
+    print(f"ℹ️ Loaded {len(new_data_df)} rows of data from {file_path}")
 
-    # First, attempt to find the existing file
+    # Use the robust find_spreadsheet function to search for existing file
     existing_file = find_spreadsheet(drive_service, file_name, folder_id)
 
     if existing_file:
-        try:
-            spreadsheet_id = existing_file["id"]
-            print(f"Working with existing spreadsheet ID: {spreadsheet_id}")
+        # Update existing spreadsheet
+        spreadsheet_id = existing_file["id"]
+        print(f"ℹ️ Updating existing spreadsheet: {existing_file['name']}")
 
-            # Get existing data from the sheet
+        try:
+            # Get the actual sheet name from the spreadsheet
             sheet_metadata = (
                 sheets_service.spreadsheets()
                 .get(spreadsheetId=spreadsheet_id)
                 .execute()
             )
+            if "sheets" in sheet_metadata and len(sheet_metadata["sheets"]) > 0:
+                sheet_title = sheet_metadata["sheets"][0]["properties"]["title"]
+                print(f"ℹ️ Found sheet with name: {sheet_title}")
+            else:
+                # If no sheets found, create a new one named "Data"
+                sheet_title = "Data"
+                body = {
+                    "requests": [{"addSheet": {"properties": {"title": sheet_title}}}]
+                }
+                sheets_service.spreadsheets().batchUpdate(
+                    spreadsheetId=spreadsheet_id, body=body
+                ).execute()
+                print(f"ℹ️ Created new sheet with name: {sheet_title}")
 
-            # DEBUG: Print all available sheet names
-            print("DEBUG: Available sheets in this spreadsheet:")
-            for sheet in sheet_metadata["sheets"]:
-                print(
-                    f"  - {sheet['properties']['title']} (Sheet ID: {sheet['properties']['sheetId']})"
-                )
+            # Prepare data for upload
+            values = [new_data_df.columns.tolist()]
+            for _, row in new_data_df.iterrows():
+                values.append([str(val) if val != "" else "" for val in row.tolist()])
 
-            # Use the first sheet or look for one with a matching name
-            sheet_title = sheet_metadata["sheets"][0]["properties"]["title"]
-
-            # Try to find a sheet with a name matching our file (without extension)
-            clean_filename = file_name.replace(".csv", "").strip()
-            for sheet in sheet_metadata["sheets"]:
-                if sheet["properties"]["title"].lower() == clean_filename.lower():
-                    sheet_title = sheet["properties"]["title"]
-                    break
-
-            print(f"Reading data from sheet: {sheet_title}")
-
+            # Clear existing data
             try:
-                # Try to get the sheet data
-                sheet_data = (
-                    sheets_service.spreadsheets()
-                    .values()
-                    .get(spreadsheetId=spreadsheet_id, range=sheet_title)
-                    .execute()
-                )
+                sheets_service.spreadsheets().values().clear(
+                    spreadsheetId=spreadsheet_id, range=f"{sheet_title}"
+                ).execute()
+                print(f"ℹ️ Cleared existing data from sheet '{sheet_title}'")
+            except Exception as e:
+                print(f"⚠️ Could not clear sheet: {e}")
+                print("ℹ️ Will attempt to overwrite data instead")
 
-                if "values" in sheet_data and len(sheet_data["values"]) > 1:
-                    print(
-                        f"Found {len(sheet_data['values']) - 1} rows of existing data"
-                    )
+            # Update with new data
+            sheets_service.spreadsheets().values().update(
+                spreadsheetId=spreadsheet_id,
+                range=f"{sheet_title}!A1",
+                valueInputOption="RAW",
+                body={"values": values},
+            ).execute()
 
-                    # Convert Google Sheet data to DataFrame
-                    existing_headers = sheet_data["values"][0]
-                    existing_data = sheet_data["values"][1:]
-
-                    # Handle empty cells in the data
-                    for row in existing_data:
-                        while len(row) < len(existing_headers):
-                            row.append("")
-
-                    existing_df = pd.DataFrame(existing_data, columns=existing_headers)
-
-                    # Process the data as before...
-                    # (Keeping the existing merging logic)
-
-                    # Convert date strings to datetime for comparison
-                    if "date" in existing_df.columns and "date" in new_data_df.columns:
-                        existing_df["date"] = pd.to_datetime(
-                            existing_df["date"], errors="coerce"
-                        )
-                        new_data_df["date"] = pd.to_datetime(
-                            new_data_df["date"], errors="coerce"
-                        )
-
-                    # Create unique keys for identifying unique rows
-                    if (
-                        "campaign_id" in existing_df.columns
-                        and "campaign_id" in new_data_df.columns
-                    ):
-                        existing_df["unique_key"] = (
-                            existing_df["date"].astype(str)
-                            + "_"
-                            + existing_df["campaign_id"].astype(str)
-                        )
-                        new_data_df["unique_key"] = (
-                            new_data_df["date"].astype(str)
-                            + "_"
-                            + new_data_df["campaign_id"].astype(str)
-                        )
-
-                        # Remove rows from existing data that will be updated
-                        merged_df = pd.concat(
-                            [
-                                existing_df[
-                                    ~existing_df["unique_key"].isin(
-                                        new_data_df["unique_key"]
-                                    )
-                                ],
-                                new_data_df,
-                            ]
-                        )
-                        merged_df = merged_df.drop(columns=["unique_key"])
-
-                        # Convert dates back to string format
-                        if "date" in merged_df.columns:
-                            merged_df["date"] = merged_df["date"].dt.strftime(
-                                "%Y-%m-%d"
-                            )
-
-                        print(f"Merged data has {len(merged_df)} rows")
-
-                        # Sort by date and campaign_id
-                        if (
-                            "date" in merged_df.columns
-                            and "campaign_id" in merged_df.columns
-                        ):
-                            merged_df = merged_df.sort_values(["date", "campaign_id"])
-
-                        # Prepare data for uploading - ensure all values are JSON-safe
-                        values = [merged_df.columns.tolist()]
-                        for _, row in merged_df.iterrows():
-                            # Convert each value to string if not empty
-                            cleaned_row = [
-                                str(val) if val != "" else "" for val in row.tolist()
-                            ]
-                            values.append(cleaned_row)
-
-                        # Clear the sheet first
-                        clear_request = (
-                            sheets_service.spreadsheets()
-                            .values()
-                            .clear(spreadsheetId=spreadsheet_id, range=sheet_title)
-                        )
-                        clear_request.execute()
-                        print(f"Cleared existing data from sheet")
-
-                        # Then update with new data
-                        update_request = (
-                            sheets_service.spreadsheets()
-                            .values()
-                            .update(
-                                spreadsheetId=spreadsheet_id,
-                                range=f"{sheet_title}!A1",
-                                valueInputOption="RAW",
-                                body={"values": values},
-                            )
-                        )
-                        response = update_request.execute()
-                        print(
-                            f"Updated {response.get('updatedCells')} cells in the spreadsheet"
-                        )
-
-                        return spreadsheet_id
-                    else:
-                        print("Missing required columns to identify unique rows")
-                else:
-                    print(
-                        "Sheet exists but has no data or only headers - will update with new data"
-                    )
-
-                    # Prepare data for uploading directly from the new CSV
-                    values = [new_data_df.columns.tolist()]
-                    for _, row in new_data_df.iterrows():
-                        # Convert each value to string if not empty
-                        cleaned_row = [
-                            str(val) if val != "" else "" for val in row.tolist()
-                        ]
-                        values.append(cleaned_row)
-
-                    # Update the existing sheet
-                    update_request = (
-                        sheets_service.spreadsheets()
-                        .values()
-                        .update(
-                            spreadsheetId=spreadsheet_id,
-                            range=f"{sheet_title}!A1",
-                            valueInputOption="RAW",
-                            body={"values": values},
-                        )
-                    )
-                    response = update_request.execute()
-                    print(
-                        f"Updated empty sheet with {response.get('updatedCells')} cells"
-                    )
-                    return spreadsheet_id
-
-            except Exception as sheet_error:
-                print(f"Error reading sheet data: {sheet_error}")
-                # Instead of immediately falling back to creating a new file,
-                # we can try updating the sheet directly
-                try:
-                    print("Trying to update sheet directly...")
-                    values = [new_data_df.columns.tolist()]
-                    for _, row in new_data_df.iterrows():
-                        cleaned_row = [
-                            str(val) if val != "" else "" for val in row.tolist()
-                        ]
-                        values.append(cleaned_row)
-
-                    # Update the existing sheet
-                    update_request = (
-                        sheets_service.spreadsheets()
-                        .values()
-                        .update(
-                            spreadsheetId=spreadsheet_id,
-                            range=f"{sheet_title}!A1",
-                            valueInputOption="RAW",
-                            body={"values": values},
-                        )
-                    )
-                    response = update_request.execute()
-                    print(
-                        f"Direct update successful with {response.get('updatedCells')} cells"
-                    )
-                    return spreadsheet_id
-                except Exception as direct_update_error:
-                    print(f"Direct update failed: {direct_update_error}")
+            print(f"✅ Successfully updated spreadsheet with {len(new_data_df)} rows")
+            return spreadsheet_id
 
         except Exception as e:
-            print(f"Error updating existing spreadsheet: {e}")
-            print("Falling back to file replacement method")
+            error_message = f"❌ Error updating spreadsheet: {e}"
+            print(error_message)
+            send_notification_with_fallback(f"ERROR: {error_message}")
+            return None
 
-    # If we couldn't update or no file exists, create a new file
-    print("Creating new spreadsheet...")
-    media = MediaFileUpload(file_path, mimetype="text/csv", resumable=True)
-    file_metadata = {
-        "name": file_name,
-        "parents": [folder_id],
-        "mimeType": "application/vnd.google-apps.spreadsheet",
-    }
-
-    file = (
-        drive_service.files()
-        .create(
-            body=file_metadata,
-            media_body=media,
-            fields="id, name",
-            supportsAllDrives=True,
+    else:
+        # File not found - send notification and return None
+        error_message = (
+            f"❌ PubPlus data file not found in Google Drive. Cannot update data."
         )
-        .execute()
-    )
-
-    print(f"Created new spreadsheet: {file['name']} (ID: {file['id']})")
-    return file["id"]
+        print(error_message)
+        send_notification_with_fallback(f"ALERT: {error_message}")
+        return None
