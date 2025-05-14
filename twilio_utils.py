@@ -38,11 +38,11 @@ def send_notification(message):
 
     # Debug credentials (masked for security)
     print(
-        f"Twilio SID: {account_sid[:5]}...{account_sid[-5:] if account_sid else 'None'}"
+        f"Twilio SID: {account_sid[:5]}...{account_sid[-5:] if account_sid else 'None'}" if account_sid else "Twilio SID: None"
     )
     print(f"Auth Token Set: {'Yes' if auth_token else 'No'}")
-    print(f"From Number: {from_number}")
-    print(f"To Number: {to_number[:3]}...{to_number[-3:] if to_number else 'None'}")
+    print(f"From Number: {from_number if from_number else 'None'}")
+    print(f"To Number: {to_number[:3]}...{to_number[-3:] if to_number else 'None'}" if to_number else "To Number: None")
 
     # Check if credentials exist
     if not account_sid or not auth_token or not from_number or not to_number:

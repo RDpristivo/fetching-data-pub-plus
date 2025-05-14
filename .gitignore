@@ -1,29 +1,12 @@
-# Campaign data directory
-campaign_data/
-credentials.json
-token.pickle
-.env
-
-# Security and Credentials
-credentials/
-*credentials*.json
-*token*.json
-*token*.pickle
-client_secrets.json
-service-account.json
-*.key
-*.pem
-
-# Python
+# Python bytecode files
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
-env/
+
+# Distribution / packaging
+dist/
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -37,17 +20,39 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+# Virtual environments
 venv/
+env/
 ENV/
 
-# IDE
+# Environment variables
+.env
+
+# API credentials and tokens
+credentials.json
+token.pickle
+*credentials*.json
+*token*.json
+*token*.pickle
+client_secrets.json
+service-account.json
+*.key
+*.pem
+
+# Local data files
+campaign_data/
+campaign_data/*.csv
+
+# Logs
+*.log
+
+# IDE specific files
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# OS
+# OS specific files
 .DS_Store
 .DS_Store?
 ._*
@@ -55,5 +60,3 @@ ENV/
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# Last Commit | Working
