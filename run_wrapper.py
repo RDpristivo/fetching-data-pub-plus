@@ -28,27 +28,53 @@ def main():
         # Determine python command based on OS
         python_cmd = "python" if platform.system() == "Windows" else "python3"
         
-        # Run the actual script with python
-        process = subprocess.run(
-            [python_cmd, main_script],
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        # Set up process with proper encoding for Windows
+        if platform.system() == "Windows":
+            # For Windows, we need to set up the process with specific encoding
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            
+            process = subprocess.run(
+                [python_cmd, main_script],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                startupinfo=startupinfo,
+                check=True
+            )
+        else:
+            # For Unix-like systems
+            process = subprocess.run(
+                [python_cmd, main_script],
+                capture_output=True,
+                text=True,
+                check=True
+            )
         
-        # Print stdout
+        # Print stdout using proper encoding
         if process.stdout:
+            if platform.system() == "Windows":
+                sys.stdout.reconfigure(encoding='utf-8')
             print(process.stdout)
             
         return 0
             
     except subprocess.CalledProcessError as e:
         print(f"Error running main.py: {e}")
-        print(f"Error output: {e.stderr}")
+        if e.stderr:
+            if platform.system() == "Windows":
+                sys.stderr.reconfigure(encoding='utf-8')
+            print(f"Error output: {e.stderr}")
         return 1
     except Exception as e:
         print(f"Error in wrapper script: {str(e)}")
         return 1
 
 if __name__ == "__main__":
+    # Configure UTF-8 encoding for Windows console
+    if platform.system() == "Windows":
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
     exit(main())
