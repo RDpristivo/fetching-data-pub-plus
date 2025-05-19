@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 import platform
+import io
 
 def main():
     try:
@@ -30,17 +31,13 @@ def main():
         
         # Set up process with proper encoding for Windows
         if platform.system() == "Windows":
-            # For Windows, we need to set up the process with specific encoding
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            
+            # For Windows, use shell=True to handle encoding properly
             process = subprocess.run(
-                [python_cmd, main_script],
+                f'"{python_cmd}" "{main_script}"',
+                shell=True,
                 capture_output=True,
-                text=True,
                 encoding='utf-8',
                 errors='replace',
-                startupinfo=startupinfo,
                 check=True
             )
         else:
@@ -52,10 +49,8 @@ def main():
                 check=True
             )
         
-        # Print stdout using proper encoding
+        # Print stdout
         if process.stdout:
-            if platform.system() == "Windows":
-                sys.stdout.reconfigure(encoding='utf-8')
             print(process.stdout)
             
         return 0
@@ -63,8 +58,6 @@ def main():
     except subprocess.CalledProcessError as e:
         print(f"Error running main.py: {e}")
         if e.stderr:
-            if platform.system() == "Windows":
-                sys.stderr.reconfigure(encoding='utf-8')
             print(f"Error output: {e.stderr}")
         return 1
     except Exception as e:
@@ -72,9 +65,11 @@ def main():
         return 1
 
 if __name__ == "__main__":
-    # Configure UTF-8 encoding for Windows console
+    # Set up UTF-8 encoding for Windows
     if platform.system() == "Windows":
-        import codecs
-        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
-        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+        # Force UTF-8 encoding for stdout and stderr
+        if sys.stdout.encoding != 'utf-8':
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        if sys.stderr.encoding != 'utf-8':
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
     exit(main())
