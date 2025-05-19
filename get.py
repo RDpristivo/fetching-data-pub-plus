@@ -35,7 +35,7 @@ def get_campaign_data(start_date, end_date):
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-site",
-        "traceparent": "00-000000000000000014b36b0851fa5160-7dfd6b3569f89aa2-01",
+        "traceparent": "00-00000000000000003d58d304f185678a-1c67e4dd83864e04-01",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
         "x-pp-client-id": "7f156802-18bf-47f1-a8da-719a625fcaca",
         "x-pp-git-version": "c6986e576d509b7e5a53299009ff5792a3455863"

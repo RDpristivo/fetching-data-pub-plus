@@ -59,50 +59,45 @@ def main():
     failed_days = 0
     empty_days = 0
 
-    # Fetch data for each day in the last 30 days
+    # Fetch data for each day in the last 7 days
     current_date = start_date
+    campaigns_by_date = {}  # Dictionary to track campaigns per date
+    
     while current_date <= today:
         date_str = current_date.strftime("%Y-%m-%d")
-        # Use 5-hour intervals to match the working API pattern
-        for hour in range(0, 24, 5):
-            start_hour = hour
-            end_hour = min(hour + 5, 24)
-            
-            start_datetime = f"{date_str} {start_hour:02d}:00:00"
-            end_datetime = f"{date_str} {end_hour:02d}:00:00"
+        
+        # Set time range for the entire day
+        start_datetime = f"{date_str} 00:00:00"
+        end_datetime = f"{date_str} 23:59:59"
 
-            print(f"\nℹ️ Fetching data for {date_str} ({start_hour:02d}:00 - {end_hour:02d}:00)...")
+        print(f"\nℹ️ Fetching data for {date_str}...")
 
-            response_data = get_campaign_data(start_datetime, end_datetime)
+        response_data = get_campaign_data(start_datetime, end_datetime)
 
-            if response_data:
-                campaigns_list = process_campaigns_data(response_data)
-                if campaigns_list and len(campaigns_list) > 0:
-                    for campaign in campaigns_list:
-                        campaign["date"] = date_str
-                    all_campaigns.extend(campaigns_list)
-                    print(f"✅ Successfully processed {len(campaigns_list)} campaigns")
-                else:
-                    print(f"⚠️ No campaign data found for this time period")
-
-            # Add delay between requests to avoid rate limiting
-            if hour < 20:  # Don't sleep after the last request of the day
-                print("ℹ️ Waiting before next request...")
-                time.sleep(2)  # Add 2 second delay between requests
-
-        if any(campaign["date"] == date_str for campaign in all_campaigns):
-            successful_days += 1
-        elif response_data is None:
-            failed_days += 1
+        if response_data:
+            campaigns_list = process_campaigns_data(response_data)
+            if campaigns_list and len(campaigns_list) > 0:
+                for campaign in campaigns_list:
+                    campaign["date"] = date_str
+                all_campaigns.extend(campaigns_list)
+                successful_days += 1
+                campaigns_by_date[date_str] = len(campaigns_list)
+                print(f"✅ Successfully processed {len(campaigns_list)} campaigns for {date_str}")
+            else:
+                empty_days += 1
+                campaigns_by_date[date_str] = 0
+                print(f"⚠️ No campaign data found for {date_str}")
         else:
-            empty_days += 1
+            failed_days += 1
+            campaigns_by_date[date_str] = 0
+            print(f"❌ Failed to fetch data for {date_str}")
 
         current_date += timedelta(days=1)
 
         # Add delay between days to avoid rate limiting
         if current_date <= today:
-            print("ℹ️ Waiting before next day...")
-            time.sleep(5)  # Add 5 second delay between days
+            print("ℹ️ Waiting before next request...")
+            time.sleep(5)  # Add 5 second delay between requests
 
     # Summary of data collection
     print(f"\n📊 Data collection summary:")
@@ -110,6 +105,11 @@ def main():
     print(f"  ⚠️ Empty days: {empty_days}")
     print(f"  ❌ Failed days: {failed_days}")
     print(f"  📋 Total campaigns collected: {len(all_campaigns)}")
+    
+    # Print campaigns per date
+    print("\n📅 Campaigns per date:")
+    for date, count in sorted(campaigns_by_date.items()):
+        print(f"  {date}: {count} campaigns")
 
     if all_campaigns:
         # Save/update local CSV
