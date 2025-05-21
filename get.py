@@ -67,3 +67,50 @@ def get_campaign_data(start_date, end_date):
         print(error_message)
         send_notification_with_fallback(f"ERROR: {error_message}")
         return None
+
+def process_campaigns_data(response_data):
+    """Process the raw campaign data into a list of dictionaries"""
+    try:
+        campaigns_list = []
+        
+        # Debug print
+        print("\n🔍 Debug - Processing campaign data:")
+        print(f"  Number of campaigns in response: {len(response_data)}")
+        
+        for campaign in response_data:
+            processed_campaign = {
+                "campaign_id": campaign.get("campaign_id", ""),
+                "campaign_name": campaign.get("campaign_name", ""),
+                "date": campaign.get("date", ""),  # Make sure date is being set correctly
+                "impressions": campaign.get("impressions", 0),
+                "clicks": campaign.get("clicks", 0),
+                "ctr": campaign.get("ctr", 0),
+                "revenue": campaign.get("revenue", 0),
+                "ecpm": campaign.get("ecpm", 0),
+                "profit": campaign.get("profit", 0),
+                "margin": campaign.get("margin", 0),
+                "cpc": campaign.get("cpc", 0),
+                "network": campaign.get("network", ""),
+                "network_account_id": campaign.get("network_account_id", ""),
+                "network_placement_id": campaign.get("network_placement_id", ""),
+                "network_app_id": campaign.get("network_app_id", ""),
+                "network_campaign_id": campaign.get("network_campaign_id", ""),
+                "network_campaign_name": campaign.get("network_campaign_name", ""),
+                "network_placement_name": campaign.get("network_placement_name", ""),
+                "network_app_name": campaign.get("network_app_name", ""),
+                "network_account_name": campaign.get("network_account_name", ""),
+            }
+            campaigns_list.append(processed_campaign)
+            
+        # Debug print sample of processed data
+        if campaigns_list:
+            print(f"  Sample campaign dates:")
+            for i, campaign in enumerate(campaigns_list[:5]):
+                print(f"    Campaign {i+1}: {campaign['date']}")
+                
+        return campaigns_list
+    except Exception as e:
+        error_message = f"❌ Error processing campaign data: {e}"
+        print(error_message)
+        send_notification_with_fallback(f"ERROR: {error_message}")
+        return None

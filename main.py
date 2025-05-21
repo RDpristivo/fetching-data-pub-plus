@@ -9,6 +9,7 @@ from drive_handler import (
     get_google_drive_service,
     create_folder_if_not_exists,
     upload_csv_to_drive,
+    upload_df_to_drive,
 )
 from twilio_utils import send_notification_with_fallback
 
@@ -51,7 +52,7 @@ def main():
 
     # Get current date and calculate start date (30 days ago)
     today = datetime.now()
-    start_date = today - timedelta(days=7)
+    start_date = today - timedelta(days=70)
     print(f"ℹ️ Fetching data from {start_date.strftime('%Y-%m-%d')} to {today.strftime('%Y-%m-%d')}")
 
     all_campaigns = []
@@ -112,15 +113,20 @@ def main():
         print(f"  {date}: {count} campaigns")
 
     if all_campaigns:
-        # Save/update local CSV
-        save_to_csv(all_campaigns, filename)
-        print(f"✅ Saved data to local CSV: {filename}")
-
         # Upload to Google Drive
         try:
             print(f"ℹ️ Uploading data to Google Drive...")
-            file_id = upload_csv_to_drive(drive_service, sheets_service, filename, drive_folder_id)
-
+            
+            # First save to CSV
+            save_to_csv(all_campaigns, filename)
+            print(f"✅ Saved data to local CSV: {filename}")
+            
+            # Create DataFrame directly from all_campaigns
+            df = pd.DataFrame(all_campaigns)
+            
+            # Upload DataFrame directly
+            file_id = upload_df_to_drive(drive_service, sheets_service, df, drive_folder_id)
+            
             if file_id:
                 success_message = f"✅ Data successfully updated in Google Drive spreadsheet"
                 print(success_message)
@@ -151,3 +157,65 @@ if __name__ == "__main__":
         error_message = f"❌ CRITICAL ERROR: {e}"
         print(error_message)
         send_notification_with_fallback(f"CRITICAL ERROR: {error_message}")
+
+def save_to_csv(campaigns, filename):
+    """Save campaign data to CSV file"""
+    try:
+        # Debug print raw data
+        print("\n🔍 Debug - Raw data before DataFrame conversion:")
+        print(f"  Number of campaigns: {len(campaigns)}")
+        date_counts = {}
+        for campaign in campaigns:
+            date = campaign['date']
+            date_counts[date] = date_counts.get(date, 0) + 1
+        
+        print("  Date distribution in raw data:")
+        for date in sorted(date_counts.keys()):
+            print(f"    {date}: {date_counts[date]} campaigns")
+        
+        # Convert list of dictionaries to DataFrame
+        df = pd.DataFrame(campaigns)
+        
+        # Debug print before saving
+        print("\n🔍 Debug - Data being saved to CSV:")
+        print(f"  Date range in memory: {df['date'].min()} to {df['date'].max()}")
+        print(f"  Total rows: {len(df)}")
+        
+        # Save to CSV with explicit date format
+        df.to_csv(filename, index=False, date_format='%Y-%m-%d')
+        print(f"Saved {len(df)} rows to {filename}")
+        
+        # Verify saved data
+        df_check = pd.read_csv(filename)
+        print("\n🔍 Debug - Verification after save:")
+        print(f"  Date range in saved file: {df_check['date'].min()} to {df_check['date'].max()}")
+        print(f"  Total rows in file: {len(df_check)}")
+        
+        # Check for date format issues
+        print("\n🔍 Debug - Date format check:")
+        date_samples = df_check['date'].sample(min(5, len(df_check))).tolist()
+        print(f"  Sample dates from file: {date_samples}")
+        
+        # Verify all dates are present
+        date_counts_in_file = df_check['date'].value_counts().to_dict()
+        print(f"  Number of unique dates in file: {len(date_counts_in_file)}")
+        
+        # Check for missing dates
+        missing_dates = []
+        for date in date_counts:
+            if date not in date_counts_in_file:
+                missing_dates.append(date)
+        
+        if missing_dates:
+            print(f"⚠️ WARNING: {len(missing_dates)} dates are missing in the saved file!")
+            print(f"  Missing dates: {missing_dates}")
+        else:
+            print("✅ All dates from raw data are present in the saved file")
+        
+        return df_check  # Return the dataframe for direct use
+        
+    except Exception as e:
+        error_message = f"❌ Error saving to CSV: {e}"
+        print(error_message)
+        send_notification_with_fallback(f"ERROR: {error_message}")
+        return None
