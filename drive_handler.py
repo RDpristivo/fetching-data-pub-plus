@@ -479,20 +479,13 @@ def upload_df_to_drive(drive_service, sheets_service, df, folder_id):
     new_data_df['date'] = pd.to_datetime(new_data_df['date'])
     new_data_df = new_data_df.fillna("")  # Replace NaN values
     
-    # Check for March data specifically
-    march_data = new_data_df[new_data_df['date'] < '2025-04-01']
-    print(f"\n🔍 Debug - March data check:")
-    print(f"  March data count: {len(march_data)}")
-    if len(march_data) > 0:
-        print(f"  March data range: {march_data['date'].min()} to {march_data['date'].max()}")
-        print(f"  Sample March records:")
-        # Safely print sample records without assuming column names
-        for i, (_, row) in enumerate(march_data.head(3).iterrows()):
-            print(f"    Record {i+1}: Date = {row['date'].strftime('%Y-%m-%d')}")
+    # Get the date range of new data
+    min_new_date = new_data_df['date'].min()
+    max_new_date = new_data_df['date'].max()
     
-    print(f"\n🔍 Debug - New data dates before processing:")
-    print(f"  Min date in new data: {new_data_df['date'].min()}")
-    print(f"  Max date in new data: {new_data_df['date'].max()}")
+    print(f"\n🔍 Debug - New data date range:")
+    print(f"  Min date: {min_new_date}")
+    print(f"  Max date: {max_new_date}")
     print(f"  Total rows: {len(new_data_df)}")
 
     # Try to find existing spreadsheet
@@ -529,117 +522,89 @@ def upload_df_to_drive(drive_service, sheets_service, df, folder_id):
             range=f"{sheet_title}"
         ).execute()
 
-        if 'values' in existing_data:
+        if 'values' in existing_data and len(existing_data['values']) > 1:
             # Convert existing data to DataFrame
             existing_df = pd.DataFrame(existing_data['values'][1:], columns=existing_data['values'][0])
-            print(f"\n🔍 Debug - Existing sheet data:")
-            print(f"  Min date in sheet: {existing_df['date'].min()}")
-            print(f"  Max date in sheet: {existing_df['date'].max()}")
-
-            # Convert date columns to datetime for comparison
             existing_df['date'] = pd.to_datetime(existing_df['date'])
+            
+            print(f"\n🔍 Debug - Existing sheet data:")
+            print(f"  Total existing rows: {len(existing_df)}")
+            print(f"  Existing date range: {existing_df['date'].min()} to {existing_df['date'].max()}")
 
-            # Remove any existing data for dates we're updating
-            min_new_date = new_data_df['date'].min()
-            max_new_date = new_data_df['date'].max()
+            # Remove ALL existing data that falls within the new data date range
+            # This prevents duplication when re-running for the same dates
             old_data_df = existing_df[
                 (existing_df['date'] < min_new_date) | 
                 (existing_df['date'] > max_new_date)
             ]
             
-            print(f"\n🔍 Debug - After filtering old data:")
-            print(f"  Rows kept from old data: {len(old_data_df)}")
+            # Count how many rows we're removing
+            removed_rows = len(existing_df) - len(old_data_df)
+            
+            print(f"\n🔍 Debug - Data filtering:")
+            print(f"  Rows being removed (overlapping dates): {removed_rows}")
+            print(f"  Rows kept from existing data: {len(old_data_df)}")
             if len(old_data_df) > 0:
-                print(f"  Old data min: {old_data_df['date'].min()}")
-                print(f"  Old data max: {old_data_df['date'].max()}")
+                print(f"  Kept data date range: {old_data_df['date'].min()} to {old_data_df['date'].max()}")
             
             # Combine old and new data
-            combined_df = pd.concat([old_data_df, new_data_df])
-            # Sort by date in descending order (newest first)
-            combined_df = combined_df.sort_values('date', ascending=False)
+            combined_df = pd.concat([old_data_df, new_data_df], ignore_index=True)
             
-            print(f"\n🔍 Debug - Before string conversion:")
-            print(f"  Combined min: {combined_df['date'].min()}")
-            print(f"  Combined max: {combined_df['date'].max()}")
-            
-            # Convert back to string format
-            combined_df['date'] = combined_df['date'].dt.strftime('%Y-%m-%d')
-            
-            print(f"ℹ️ Combined data has {len(combined_df)} rows")
-            
-            # Prepare data for upload in chunks
-            values = [combined_df.columns.tolist()]
-            chunk_size = 1000  # Upload in smaller chunks to avoid timeout
-            
-            for i in range(0, len(combined_df), chunk_size):
-                chunk = combined_df.iloc[i:i+chunk_size]
-                chunk_values = []
-                for _, row in chunk.iterrows():
-                    chunk_values.append([str(val) if val != "" else "" for val in row.tolist()])
-                values.extend(chunk_values)
-                
-                if i == 0:
-                    # Clear existing data and upload first chunk
-                    sheets_service.spreadsheets().values().clear(
-                        spreadsheetId=spreadsheet_id, range=f"{sheet_title}"
-                    ).execute()
-                    print(f"ℹ️ Cleared sheet for update")
-                    
-                    # Upload header and first chunk
-                    sheets_service.spreadsheets().values().update(
-                        spreadsheetId=spreadsheet_id,
-                        range=f"{sheet_title}!A1",
-                        valueInputOption="RAW",
-                        body={"values": values},
-                    ).execute()
-                    values = []  # Reset values for next chunks
-                else:
-                    # Append subsequent chunks
-                    sheets_service.spreadsheets().values().append(
-                        spreadsheetId=spreadsheet_id,
-                        range=f"{sheet_title}!A1",
-                        valueInputOption="RAW",
-                        body={"values": chunk_values},
-                    ).execute()
-                
-                print(f"✅ Uploaded chunk {i//chunk_size + 1} of {(len(combined_df) + chunk_size - 1)//chunk_size}")
-                time.sleep(1)  # Small delay between chunks
         else:
             # No existing data, just use new data
-            # Sort new data by date in descending order
-            new_data_df = new_data_df.sort_values('date', ascending=False)
-            new_data_df['date'] = new_data_df['date'].dt.strftime('%Y-%m-%d')
+            print(f"\n🔍 Debug - No existing data found, using new data only")
+            combined_df = new_data_df.copy()
+        
+        # Sort by date in descending order (newest first)
+        combined_df = combined_df.sort_values('date', ascending=False)
+        
+        print(f"\n🔍 Debug - Final combined data:")
+        print(f"  Total rows: {len(combined_df)}")
+        print(f"  Date range: {combined_df['date'].min()} to {combined_df['date'].max()}")
+        
+        # Convert back to string format for upload
+        combined_df['date'] = combined_df['date'].dt.strftime('%Y-%m-%d')
+        
+        # Clear the entire sheet and upload all data
+        sheets_service.spreadsheets().values().clear(
+            spreadsheetId=spreadsheet_id, range=f"{sheet_title}"
+        ).execute()
+        print(f"ℹ️ Cleared sheet for complete update")
+        
+        # Prepare data for upload in chunks
+        chunk_size = 1000
+        
+        # Upload header first
+        header_values = [combined_df.columns.tolist()]
+        sheets_service.spreadsheets().values().update(
+            spreadsheetId=spreadsheet_id,
+            range=f"{sheet_title}!A1",
+            valueInputOption="RAW",
+            body={"values": header_values},
+        ).execute()
+        
+        # Upload data in chunks
+        for i in range(0, len(combined_df), chunk_size):
+            chunk = combined_df.iloc[i:i+chunk_size]
+            chunk_values = []
+            for _, row in chunk.iterrows():
+                chunk_values.append([str(val) if val != "" else "" for val in row.tolist()])
             
-            # Upload in chunks
-            values = [new_data_df.columns.tolist()]
-            chunk_size = 1000
+            # Calculate the starting row (A2 for first chunk, then continue)
+            start_row = i + 2  # +2 because row 1 is header and we're 0-indexed
+            range_name = f"{sheet_title}!A{start_row}"
             
-            for i in range(0, len(new_data_df), chunk_size):
-                chunk = new_data_df.iloc[i:i+chunk_size]
-                chunk_values = []
-                for _, row in chunk.iterrows():
-                    chunk_values.append([str(val) if val != "" else "" for val in row.tolist()])
-                
-                if i == 0:
-                    values.extend(chunk_values)
-                    sheets_service.spreadsheets().values().update(
-                        spreadsheetId=spreadsheet_id,
-                        range=f"{sheet_title}!A1",
-                        valueInputOption="RAW",
-                        body={"values": values},
-                    ).execute()
-                else:
-                    sheets_service.spreadsheets().values().append(
-                        spreadsheetId=spreadsheet_id,
-                        range=f"{sheet_title}!A1",
-                        valueInputOption="RAW",
-                        body={"values": chunk_values},
-                    ).execute()
-                
-                print(f"✅ Uploaded chunk {i//chunk_size + 1} of {(len(new_data_df) + chunk_size - 1)//chunk_size}")
-                time.sleep(1)
+            sheets_service.spreadsheets().values().update(
+                spreadsheetId=spreadsheet_id,
+                range=range_name,
+                valueInputOption="RAW",
+                body={"values": chunk_values},
+            ).execute()
+            
+            print(f"✅ Uploaded chunk {i//chunk_size + 1} of {(len(combined_df) + chunk_size - 1)//chunk_size}")
+            time.sleep(0.5)  # Small delay between chunks
 
-        print(f"✅ Successfully updated spreadsheet")
+        print(f"✅ Successfully updated spreadsheet with {len(combined_df)} total rows")
         return spreadsheet_id
 
     except Exception as e:
