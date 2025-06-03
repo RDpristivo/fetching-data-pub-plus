@@ -25,7 +25,7 @@ def get_campaign_data(start_date, end_date):
     headers = {
         "accept": "application/json, text/plain, */*",
         "accept-language": "en",
-        "authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NDc2MzYzNzgsImV4cCI6MTc0ODg0NTk3OCwiYXV0aF9zZWNyZXQiOiIxOTNlMzRkMTdiY2I0ZmMzYzBjYjc4NzE4NzliODQyZWY0YzU3Mzk1OGI3MTExYzA4NDRiZjA5MmEyYTZmYjIxNTc4NjJhYWQxYmRiNTAyMzc4NjAxNTAwOWM2ZTJjYTU5NTcwY2M3MjRhNDE2YTg3YjM2NDdlZDE3Mjk5NzI5NCJ9.PEhdULJAmfST_wg_Pgj5CnlHV9t52f9lg2OF9e70Rro",
+        "authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NDg5MzU3MjAsImV4cCI6MTc1MDE0NTMyMCwiYXV0aF9zZWNyZXQiOiI4ZmM5M2Q5NDFkM2M2NTY2NjJjMWZkYmJlM2FmMDViOTZmYjcxOWQzMTE2ZTAyMzdlNzRhOWFlYjAzNDYzOGQ5MDg1NjAzMjVmY2IyMDFiNDk5NzM5NmQxYzQ1OGY0N2U2YjhjMjM0ZWZhMTAzOWIxMDIxYTU3MWE2MTIzNTM5YiJ9.8Hje9sYV22U5fdRe-TodT4_YSjkPAVZ5S7_e6nC-1k4",
         "origin": "https://app.pubplus.com",
         "priority": "u=1, i",
         "referer": "https://app.pubplus.com/",
@@ -35,10 +35,10 @@ def get_campaign_data(start_date, end_date):
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-site",
-        "traceparent": "00-00000000000000003d58d304f185678a-1c67e4dd83864e04-01",
+        "traceparent": "00-0000000000000000706cc522d799978c-3bc66988021a3931-01",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-        "x-pp-client-id": "7f156802-18bf-47f1-a8da-719a625fcaca",
-        "x-pp-git-version": "c6986e576d509b7e5a53299009ff5792a3455863"
+        "x-pp-client-id": "fc2bc7cf-3749-4f72-b89f-1e8b58119891",
+        "x-pp-git-version": "8208829250836a7cfb9d6ead96c4dfbb62ae944a"
     }
 
     try:

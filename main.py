@@ -52,7 +52,7 @@ def main():
 
     # Get current date and calculate start date (30 days ago)
     today = datetime.now()
-    start_date = today - timedelta(days=7)
+    start_date = today - timedelta(days=90)
     print(f"ℹ️ Fetching data from {start_date.strftime('%Y-%m-%d')} to {today.strftime('%Y-%m-%d')}")
 
     all_campaigns = []
