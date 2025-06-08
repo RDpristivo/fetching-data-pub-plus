@@ -322,198 +322,6 @@ def find_spreadsheet(drive_service, file_name, folder_id):
         return None
 
 
-def upload_csv_to_drive(drive_service, sheets_service, file_path, folder_id):
-    """Upload CSV data to Google Drive as a spreadsheet, merging with existing data"""
-    file_name = os.path.basename(file_path)
-
-    # First check raw file content
-    print("\n🔍 Debug - Raw CSV file check:")
-    with open(file_path, 'r') as f:
-        header = f.readline().strip()
-        print(f"  CSV header: {header}")
-        first_few_lines = [f.readline().strip() for _ in range(5)]
-        print(f"  First few lines:")
-        for line in first_few_lines:
-            print(f"    {line}")
-
-    # Load new CSV data with explicit date parsing
-    new_data_df = pd.read_csv(file_path, parse_dates=['date'])
-    new_data_df = new_data_df.fillna("")  # Replace NaN values
-    
-    # Check for March data specifically
-    march_data = new_data_df[new_data_df['date'] < '2025-04-01']
-    print(f"\n🔍 Debug - March data check:")
-    print(f"  March data count: {len(march_data)}")
-    if len(march_data) > 0:
-        print(f"  March data range: {march_data['date'].min()} to {march_data['date'].max()}")
-        print(f"  Sample March records:")
-        for _, row in march_data.head(3).iterrows():
-            print(f"    {row['date'].strftime('%Y-%m-%d')}: {row['campaign_name']}")
-    
-    print(f"\n🔍 Debug - New data dates before processing:")
-    print(f"  Min date in new data: {new_data_df['date'].min()}")
-    print(f"  Max date in new data: {new_data_df['date'].max()}")
-    print(f"  Total rows: {len(new_data_df)}")
-
-    # Try to find existing spreadsheet
-    existing_file = find_spreadsheet(drive_service, file_name, folder_id)
-
-    if not existing_file:
-        error_message = f"❌ PubPlus data file not found in Google Drive. Cannot update data."
-        print(error_message)
-        send_notification_with_fallback(f"ALERT: {error_message}")
-        return None
-
-    # Update existing spreadsheet
-    spreadsheet_id = existing_file["id"]
-    print(f"ℹ️ Updating existing spreadsheet: {existing_file['name']}")
-
-    try:
-        # Get the sheet
-        sheet_metadata = sheets_service.spreadsheets().get(
-            spreadsheetId=spreadsheet_id
-        ).execute()
-        
-        if "sheets" in sheet_metadata and len(sheet_metadata["sheets"]) > 0:
-            sheet_title = sheet_metadata["sheets"][0]["properties"]["title"]
-            print(f"ℹ️ Found sheet with name: {sheet_title}")
-        else:
-            error_message = "❌ No sheets found in the spreadsheet"
-            print(error_message)
-            send_notification_with_fallback(f"ERROR: {error_message}")
-            return None
-
-        # Get existing data
-        existing_data = sheets_service.spreadsheets().values().get(
-            spreadsheetId=spreadsheet_id,
-            range=f"{sheet_title}"
-        ).execute()
-
-        if 'values' in existing_data and len(existing_data['values']) > 1:
-            # Convert existing data to DataFrame
-            existing_df = pd.DataFrame(existing_data['values'][1:], columns=existing_data['values'][0])
-            existing_df['date'] = pd.to_datetime(existing_df['date'])
-            
-            print(f"\n🔍 Debug - Existing sheet data:")
-            print(f"  Total existing rows: {len(existing_df)}")
-            print(f"  Existing date range: {existing_df['date'].min()} to {existing_df['date'].max()}")
-            print(f"  Existing columns: {len(existing_df.columns)}")
-
-            # Check for column mismatches and align columns
-            existing_columns = set(existing_df.columns)
-            new_columns = set(new_data_df.columns)
-            
-            # Find missing columns in each dataset
-            missing_in_existing = new_columns - existing_columns
-            missing_in_new = existing_columns - new_columns
-            
-            if missing_in_existing or missing_in_new:
-                print(f"\n🔍 Debug - Column alignment:")
-                print(f"  Existing sheet columns: {len(existing_columns)}")
-                print(f"  New data columns: {len(new_columns)}")
-                
-                if missing_in_existing:
-                    print(f"  Columns missing in existing sheet: {list(missing_in_existing)}")
-                    # Add missing columns to existing data with empty values
-                    for col in missing_in_existing:
-                        existing_df[col] = ""
-                
-                if missing_in_new:
-                    print(f"  Columns missing in new data: {list(missing_in_new)}")
-                    # Add missing columns to new data with empty values
-                    for col in missing_in_new:
-                        new_data_df[col] = ""
-                
-                # Ensure both dataframes have the same column order
-                all_columns = sorted(list(existing_columns.union(new_columns)))
-                existing_df = existing_df.reindex(columns=all_columns, fill_value="")
-                new_data_df = new_data_df.reindex(columns=all_columns, fill_value="")
-                
-                print(f"  After alignment - both datasets have {len(all_columns)} columns")
-
-            # Remove ALL existing data that falls within the new data date range
-            # This prevents duplication when re-running for the same dates
-            old_data_df = existing_df[
-                (existing_df['date'] < new_data_df['date'].min()) | 
-                (existing_df['date'] > new_data_df['date'].max())
-            ]
-            
-            # Count how many rows we're removing
-            removed_rows = len(existing_df) - len(old_data_df)
-            
-            print(f"\n🔍 Debug - Data filtering:")
-            print(f"  Rows being removed (overlapping dates): {removed_rows}")
-            print(f"  Rows kept from existing data: {len(old_data_df)}")
-            if len(old_data_df) > 0:
-                print(f"  Kept data date range: {old_data_df['date'].min()} to {old_data_df['date'].max()}")
-            
-            # Combine old and new data
-            combined_df = pd.concat([old_data_df, new_data_df], ignore_index=True)
-            
-        else:
-            # No existing data, just use new data
-            print(f"\n🔍 Debug - No existing data found, using new data only")
-            combined_df = new_data_df.copy()
-        
-        # Sort by date in descending order (newest first)
-        combined_df = combined_df.sort_values('date', ascending=False)
-        
-        print(f"\n🔍 Debug - Final combined data:")
-        print(f"  Total rows: {len(combined_df)}")
-        print(f"  Date range: {combined_df['date'].min()} to {combined_df['date'].max()}")
-        
-        # Convert back to string format for upload
-        combined_df['date'] = combined_df['date'].dt.strftime('%Y-%m-%d')
-        
-        # Clear the entire sheet and upload all data
-        sheets_service.spreadsheets().values().clear(
-            spreadsheetId=spreadsheet_id, range=f"{sheet_title}"
-        ).execute()
-        print(f"ℹ️ Cleared sheet for complete update")
-        
-        # Prepare data for upload in chunks
-        chunk_size = 1000
-        
-        # Upload header first
-        header_values = [combined_df.columns.tolist()]
-        sheets_service.spreadsheets().values().update(
-            spreadsheetId=spreadsheet_id,
-            range=f"{sheet_title}!A1",
-            valueInputOption="RAW",
-            body={"values": header_values},
-        ).execute()
-        
-        # Upload data in chunks
-        for i in range(0, len(combined_df), chunk_size):
-            chunk = combined_df.iloc[i:i+chunk_size]
-            chunk_values = []
-            for _, row in chunk.iterrows():
-                chunk_values.append([str(val) if val != "" else "" for val in row.tolist()])
-            
-            # Calculate the starting row (A2 for first chunk, then continue)
-            start_row = i + 2  # +2 because row 1 is header and we're 0-indexed
-            range_name = f"{sheet_title}!A{start_row}"
-            
-            sheets_service.spreadsheets().values().update(
-                spreadsheetId=spreadsheet_id,
-                range=range_name,
-                valueInputOption="RAW",
-                body={"values": chunk_values},
-            ).execute()
-            
-            print(f"✅ Uploaded chunk {i//chunk_size + 1} of {(len(combined_df) + chunk_size - 1)//chunk_size}")
-            time.sleep(0.5)  # Small delay between chunks
-
-        print(f"✅ Successfully updated spreadsheet with {len(combined_df)} total rows")
-        return spreadsheet_id
-
-    except Exception as e:
-        error_message = f"❌ Error updating spreadsheet: {e}"
-        print(error_message)
-        send_notification_with_fallback(f"ERROR: {error_message}")
-        return None
-
-
 def upload_df_to_drive(drive_service, sheets_service, df, folder_id):
     """Upload DataFrame directly to Google Drive as a spreadsheet, merging with existing data"""
     # Use the specific spreadsheet ID provided by the user
@@ -558,81 +366,190 @@ def upload_df_to_drive(drive_service, sheets_service, df, folder_id):
             range=f"{sheet_title}"
         ).execute()
 
-        if 'values' in existing_data and len(existing_data['values']) > 1:
-            # Convert existing data to DataFrame
-            existing_df = pd.DataFrame(existing_data['values'][1:], columns=existing_data['values'][0])
-            existing_df['date'] = pd.to_datetime(existing_df['date'])
+        # Get the existing column headers from the sheet first
+        existing_headers = None
+        if 'values' in existing_data and len(existing_data['values']) > 0:
+            existing_headers = existing_data['values'][0]
+            print(f"\n🔍 Debug - Existing sheet headers ({len(existing_headers)} columns):")
+            print(f"  Headers: {existing_headers}")
+        
+        print(f"\n🔍 Debug - New data headers ({len(new_data_df.columns)} columns):")
+        print(f"  Headers: {list(new_data_df.columns)}")
+        
+        # Align new data to match existing sheet structure FIRST
+        if existing_headers:
+            print(f"\n🔍 Debug - Aligning new data to existing sheet structure...")
+            new_data_aligned = pd.DataFrame()
+            for col in existing_headers:
+                if col in new_data_df.columns:
+                    new_data_aligned[col] = new_data_df[col]
+                else:
+                    new_data_aligned[col] = ""  # Fill missing columns with empty strings
+                    print(f"  ⚠️ Column '{col}' missing in new data, filling with empty values")
             
-            print(f"\n🔍 Debug - Existing sheet data:")
-            print(f"  Total existing rows: {len(existing_df)}")
-            print(f"  Existing date range: {existing_df['date'].min()} to {existing_df['date'].max()}")
-            print(f"  Existing columns: {len(existing_df.columns)}")
+            # Check for extra columns in new data that don't exist in sheet
+            extra_columns = [col for col in new_data_df.columns if col not in existing_headers]
+            if extra_columns:
+                print(f"  ⚠️ Extra columns in new data (will be ignored): {extra_columns}")
+            
+            print(f"\n🔍 Debug - After alignment:")
+            print(f"  Existing sheet columns: {len(existing_headers)}")
+            print(f"  Aligned new data columns: {len(new_data_aligned.columns)}")
+            print(f"  Column match: {list(existing_headers) == list(new_data_aligned.columns)}")
+            
+            # Use the aligned data
+            new_data_df = new_data_aligned
+            print(f"  ✅ New data successfully aligned to {len(new_data_df.columns)} columns")
 
-            # Check for column mismatches and align columns
-            existing_columns = set(existing_df.columns)
-            new_columns = set(new_data_df.columns)
+        try:
+            print(f"\n🔍 Debug - Starting data processing...")
+            print(f"  New data columns before processing: {len(new_data_df.columns)}")
             
-            # Find missing columns in each dataset
-            missing_in_existing = new_columns - existing_columns
-            missing_in_new = existing_columns - new_columns
-            
-            if missing_in_existing or missing_in_new:
-                print(f"\n🔍 Debug - Column alignment:")
-                print(f"  Existing sheet columns: {len(existing_columns)}")
-                print(f"  New data columns: {len(new_columns)}")
+            if 'values' in existing_data and len(existing_data['values']) > 1:
+                # Debug the raw data structure from Google Sheets
+                print(f"\n🔍 Debug - Raw Google Sheets data structure:")
+                print(f"  Total rows in existing_data: {len(existing_data['values'])}")
+                print(f"  Header row length: {len(existing_data['values'][0])}")
                 
-                if missing_in_existing:
-                    print(f"  Columns missing in existing sheet: {list(missing_in_existing)}")
-                    # Add missing columns to existing data with empty values
-                    for col in missing_in_existing:
-                        existing_df[col] = ""
+                # Check the length of the first few data rows
+                for i in range(1, min(6, len(existing_data['values']))):
+                    row_length = len(existing_data['values'][i])
+                    print(f"  Row {i} length: {row_length}")
+                    if row_length != len(existing_data['values'][0]):
+                        print(f"    ⚠️ Row {i} has different length than header!")
+                        print(f"    Header: {len(existing_data['values'][0])} columns")
+                        print(f"    Row {i}: {row_length} columns")
+                        # Show the extra data
+                        if row_length > len(existing_data['values'][0]):
+                            extra_data = existing_data['values'][i][len(existing_data['values'][0]):]
+                            print(f"    Extra data in row {i}: {extra_data}")
                 
-                if missing_in_new:
-                    print(f"  Columns missing in new data: {list(missing_in_new)}")
-                    # Add missing columns to new data with empty values
-                    for col in missing_in_new:
-                        new_data_df[col] = ""
+                # Try to create DataFrame with error handling
+                try:
+                    existing_df = pd.DataFrame(existing_data['values'][1:], columns=existing_headers)
+                    print(f"  ✅ Successfully created existing_df with {len(existing_df.columns)} columns")
+                except Exception as df_error:
+                    print(f"  ❌ Error creating DataFrame: {df_error}")
+                    
+                    # Try to fix by truncating rows to match header length
+                    print(f"  🔧 Attempting to fix by truncating rows to header length...")
+                    fixed_data = []
+                    header_length = len(existing_headers)
+                    
+                    for row in existing_data['values'][1:]:
+                        if len(row) > header_length:
+                            fixed_row = row[:header_length]  # Truncate to header length
+                            fixed_data.append(fixed_row)
+                        elif len(row) < header_length:
+                            # Pad with empty strings if row is shorter
+                            fixed_row = row + [''] * (header_length - len(row))
+                            fixed_data.append(fixed_row)
+                        else:
+                            fixed_data.append(row)
+                    
+                    existing_df = pd.DataFrame(fixed_data, columns=existing_headers)
+                    print(f"  ✅ Fixed and created existing_df with {len(existing_df.columns)} columns")
                 
-                # Ensure both dataframes have the same column order
-                all_columns = sorted(list(existing_columns.union(new_columns)))
-                existing_df = existing_df.reindex(columns=all_columns, fill_value="")
-                new_data_df = new_data_df.reindex(columns=all_columns, fill_value="")
+                print(f"  Created existing_df with {len(existing_df.columns)} columns")
                 
-                print(f"  After alignment - both datasets have {len(all_columns)} columns")
+                existing_df['date'] = pd.to_datetime(existing_df['date'])
+                print(f"  After date conversion, existing_df has {len(existing_df.columns)} columns")
+                
+                print(f"\n🔍 Debug - Existing sheet data:")
+                print(f"  Total existing rows: {len(existing_df)}")
+                print(f"  Existing date range: {existing_df['date'].min()} to {existing_df['date'].max()}")
+                print(f"  Existing data columns: {len(existing_df.columns)}")
 
-            # Remove ALL existing data that falls within the new data date range
-            # This prevents duplication when re-running for the same dates
-            old_data_df = existing_df[
-                (existing_df['date'] < min_new_date) | 
-                (existing_df['date'] > max_new_date)
-            ]
+                # Remove ALL existing data that falls within the new data date range
+                # This prevents duplication when re-running for the same dates
+                old_data_df = existing_df[
+                    (existing_df['date'] < min_new_date) | 
+                    (existing_df['date'] > max_new_date)
+                ]
+                print(f"  After filtering, old_data_df has {len(old_data_df.columns)} columns")
+                
+                # Count how many rows we're removing
+                removed_rows = len(existing_df) - len(old_data_df)
+                
+                print(f"\n🔍 Debug - Data filtering:")
+                print(f"  Rows being removed (overlapping dates): {removed_rows}")
+                print(f"  Rows kept from existing data: {len(old_data_df)}")
+                print(f"  Old data columns: {len(old_data_df.columns)}")
+                print(f"  New data columns before concat: {len(new_data_df.columns)}")
+                if len(old_data_df) > 0:
+                    print(f"  Kept data date range: {old_data_df['date'].min()} to {old_data_df['date'].max()}")
+                
+                # Ensure both dataframes have exactly the same columns before concatenation
+                if len(old_data_df.columns) != len(new_data_df.columns):
+                    print(f"  ⚠️ Column mismatch before concat: old={len(old_data_df.columns)}, new={len(new_data_df.columns)}")
+                    # Force both to have the same columns as existing headers
+                    old_data_df = old_data_df.reindex(columns=existing_headers, fill_value="")
+                    new_data_df = new_data_df.reindex(columns=existing_headers, fill_value="")
+                    print(f"  ✅ Forced both to {len(existing_headers)} columns")
+                    print(f"  After reindex - old_data_df: {len(old_data_df.columns)}, new_data_df: {len(new_data_df.columns)}")
+                
+                # Combine old and new data
+                print(f"  About to concat - old_data_df: {len(old_data_df.columns)}, new_data_df: {len(new_data_df.columns)}")
+                combined_df = pd.concat([old_data_df, new_data_df], ignore_index=True)
+                print(f"  Combined data columns after concat: {len(combined_df.columns)}")
+                
+            else:
+                # No existing data, just use new data
+                print(f"\n🔍 Debug - No existing data found, using new data only")
+                combined_df = new_data_df.copy()
+                print(f"  Combined data columns (new only): {len(combined_df.columns)}")
             
-            # Count how many rows we're removing
-            removed_rows = len(existing_df) - len(old_data_df)
+            # Sort by date in descending order (newest first)
+            print(f"  Before sorting: {len(combined_df.columns)} columns")
+            combined_df = combined_df.sort_values('date', ascending=False)
+            print(f"  After sorting: {len(combined_df.columns)} columns")
             
-            print(f"\n🔍 Debug - Data filtering:")
-            print(f"  Rows being removed (overlapping dates): {removed_rows}")
-            print(f"  Rows kept from existing data: {len(old_data_df)}")
-            if len(old_data_df) > 0:
-                print(f"  Kept data date range: {old_data_df['date'].min()} to {old_data_df['date'].max()}")
+            print(f"\n🔍 Debug - Final combined data:")
+            print(f"  Total rows: {len(combined_df)}")
+            print(f"  Date range: {combined_df['date'].min()} to {combined_df['date'].max()}")
+            print(f"  Columns after sorting: {len(combined_df.columns)}")
             
-            # Combine old and new data
-            combined_df = pd.concat([old_data_df, new_data_df], ignore_index=True)
+            # Convert back to string format for upload
+            print(f"  Before date string conversion: {len(combined_df.columns)} columns")
+            combined_df['date'] = combined_df['date'].dt.strftime('%Y-%m-%d')
+            print(f"  Columns after date conversion: {len(combined_df.columns)}")
             
-        else:
-            # No existing data, just use new data
-            print(f"\n🔍 Debug - No existing data found, using new data only")
-            combined_df = new_data_df.copy()
+        except Exception as e:
+            print(f"❌ Error in data processing section: {e}")
+            print(f"  Current new_data_df columns: {len(new_data_df.columns)}")
+            if 'existing_df' in locals():
+                print(f"  Current existing_df columns: {len(existing_df.columns)}")
+            if 'combined_df' in locals():
+                print(f"  Current combined_df columns: {len(combined_df.columns)}")
+            raise e
         
-        # Sort by date in descending order (newest first)
-        combined_df = combined_df.sort_values('date', ascending=False)
-        
-        print(f"\n🔍 Debug - Final combined data:")
-        print(f"  Total rows: {len(combined_df)}")
-        print(f"  Date range: {combined_df['date'].min()} to {combined_df['date'].max()}")
-        
-        # Convert back to string format for upload
-        combined_df['date'] = combined_df['date'].dt.strftime('%Y-%m-%d')
+        # Final verification - ensure column count matches exactly
+        if existing_headers:
+            expected_columns = len(existing_headers)
+            actual_columns = len(combined_df.columns)
+            
+            print(f"\n🔍 Debug - Final column verification:")
+            print(f"  Expected columns (from sheet): {expected_columns}")
+            print(f"  Actual columns (combined data): {actual_columns}")
+            
+            if expected_columns != actual_columns:
+                print(f"  ❌ Column count mismatch detected!")
+                print(f"  Expected headers: {existing_headers}")
+                print(f"  Actual headers: {list(combined_df.columns)}")
+                
+                # Force alignment to existing sheet structure
+                aligned_df = pd.DataFrame()
+                for col in existing_headers:
+                    if col in combined_df.columns:
+                        aligned_df[col] = combined_df[col]
+                    else:
+                        aligned_df[col] = ""
+                        print(f"    Adding missing column '{col}' with empty values")
+                
+                combined_df = aligned_df
+                print(f"  ✅ Forced alignment complete. New column count: {len(combined_df.columns)}")
+            else:
+                print(f"  ✅ Column count matches perfectly!")
         
         # Clear the entire sheet and upload all data
         sheets_service.spreadsheets().values().clear(
@@ -643,8 +560,15 @@ def upload_df_to_drive(drive_service, sheets_service, df, folder_id):
         # Prepare data for upload in chunks
         chunk_size = 1000
         
-        # Upload header first
-        header_values = [combined_df.columns.tolist()]
+        # Upload header first - use existing headers to maintain consistency
+        if existing_headers:
+            header_values = [existing_headers]
+        else:
+            header_values = [combined_df.columns.tolist()]
+            
+        print(f"ℹ️ About to upload headers: {len(header_values[0])} columns")
+        print(f"ℹ️ Combined data has: {len(combined_df.columns)} columns")
+        
         sheets_service.spreadsheets().values().update(
             spreadsheetId=spreadsheet_id,
             range=f"{sheet_title}!A1",
@@ -652,12 +576,21 @@ def upload_df_to_drive(drive_service, sheets_service, df, folder_id):
             body={"values": header_values},
         ).execute()
         
+        print(f"ℹ️ Uploaded headers: {len(header_values[0])} columns")
+        
         # Upload data in chunks
         for i in range(0, len(combined_df), chunk_size):
             chunk = combined_df.iloc[i:i+chunk_size]
             chunk_values = []
             for _, row in chunk.iterrows():
-                chunk_values.append([str(val) if val != "" else "" for val in row.tolist()])
+                row_values = [str(val) if val != "" else "" for val in row.tolist()]
+                if len(row_values) != len(header_values[0]):
+                    print(f"  ⚠️ Row {i} has {len(row_values)} values but header has {len(header_values[0])} columns")
+                    # Pad or trim to match header length
+                    while len(row_values) < len(header_values[0]):
+                        row_values.append("")
+                    row_values = row_values[:len(header_values[0])]
+                chunk_values.append(row_values)
             
             # Calculate the starting row (A2 for first chunk, then continue)
             start_row = i + 2  # +2 because row 1 is header and we're 0-indexed

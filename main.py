@@ -8,7 +8,6 @@ from csv_handler import process_campaigns_data, save_to_csv
 from drive_handler import (
     get_google_drive_service,
     create_folder_if_not_exists,
-    upload_csv_to_drive,
     upload_df_to_drive,
 )
 from twilio_utils import send_notification_with_fallback
