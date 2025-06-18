@@ -6,20 +6,20 @@ def test_api_connection():
     headers = {
         "accept": "application/json, text/plain, */*",
         "accept-language": "en",
-        "authorization": f"Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NDc2MzYzNzgsImV4cCI6MTc0ODg0NTk3OCwiYXV0aF9zZWNyZXQiOiIxOTNlMzRkMTdiY2I0ZmMzYzBjYjc4NzE4NzliODQyZWY0YzU3Mzk1OGI3MTExYzA4NDRiZjA5MmEyYTZmYjIxNTc4NjJhYWQxYmRiNTAyMzc4NjAxNTAwOWM2ZTJjYTU5NTcwY2M3MjRhNDE2YTg3YjM2NDdlZDE3Mjk5NzI5NCJ9.PEhdULJAmfST_wg_Pgj5CnlHV9t52f9lg2OF9e70Rro",
+        "authorization": f"Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NTAyNTQ4OTgsImV4cCI6MTc1MTQ2NDQ5OCwiYXV0aF9zZWNyZXQiOiJmM2IyMTYyNjM5OWM1MzQ4YjljZTAwYmY0YWEyZTdiMmY0ZmQ1OGJkZDQ3ZmIwYzczNmYzYTI2MThhM2FjOGVhNTEzZmNhMzZjMmFkY2JiNGZiYmY0YjY5NmM3ZDNhODE0MzM4MTFhYTgyMGE1ZDU0YjE3YjQwNjA1YmM1MDRiNiJ9.16WXln_rdcdBa7mTJFkYAPhkfpSRo-ut1WHlqCwe4k0",
         "origin": "https://app.pubplus.com",
         "priority": "u=1, i",
         "referer": "https://app.pubplus.com/",
         "sec-ch-ua": '"Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"',
         "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"',
+        "sec-ch-ua-platform": '"macOS"',
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-site",
-        "traceparent": "00-000000000000000014b36b0851fa5160-7dfd6b3569f89aa2-01",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-        "x-pp-client-id": "7f156802-18bf-47f1-a8da-719a625fcaca",
-        "x-pp-git-version": "c6986e576d509b7e5a53299009ff5792a3455863"
+        "traceparent": "00-000000000000000066666c748038d1ba-13607ef4efccf2e7-01",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+        "x-pp-client-id": "0b3ae17c-f280-4f21-aecd-8e7ef720ddb7",
+        "x-pp-git-version": "56959afe3598d81a9919c57d387e8acda71bad80"
     }
 
     # Use the exact same date and format from the curl command
