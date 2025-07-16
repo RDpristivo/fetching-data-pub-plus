@@ -6,26 +6,26 @@ def test_api_connection():
     headers = {
         "accept": "application/json, text/plain, */*",
         "accept-language": "en",
-        "authorization": f"Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NTAyNTQ4OTgsImV4cCI6MTc1MTQ2NDQ5OCwiYXV0aF9zZWNyZXQiOiJmM2IyMTYyNjM5OWM1MzQ4YjljZTAwYmY0YWEyZTdiMmY0ZmQ1OGJkZDQ3ZmIwYzczNmYzYTI2MThhM2FjOGVhNTEzZmNhMzZjMmFkY2JiNGZiYmY0YjY5NmM3ZDNhODE0MzM4MTFhYTgyMGE1ZDU0YjE3YjQwNjA1YmM1MDRiNiJ9.16WXln_rdcdBa7mTJFkYAPhkfpSRo-ut1WHlqCwe4k0",
+        "authorization": f"Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NTI2MTY3MDgsImV4cCI6MTc1MzgyNjMwOCwiYXV0aF9zZWNyZXQiOiI1ZTUxMzAwOTQwNzRlOTEyY2FiYTNiNmE5MzU5MTYwN2ZlNmJlMGY0ZWQ2ZTUxMzE1ZTA2ODliOTYyZDM2NjEwNGM3YjEyZmY5MmIyZmRkNTg2MDUwYjdmNTUxY2I4MTc2NWMzN2FkYWIwNTU4N2U1MWZjNWJmZTJjZGRiMzhhOSJ9.fQ-hK_vltvawZHVDvAKOgP4ocdGWQhbwq9d1wiQmtAs",
         "origin": "https://app.pubplus.com",
         "priority": "u=1, i",
         "referer": "https://app.pubplus.com/",
-        "sec-ch-ua": '"Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"',
+        "sec-ch-ua": '"Google Chrome";v="129", "Not=A?Brand";v="8", "Chromium";v="129"',
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"macOS"',
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-site",
-        "traceparent": "00-000000000000000066666c748038d1ba-13607ef4efccf2e7-01",
-        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
-        "x-pp-client-id": "0b3ae17c-f280-4f21-aecd-8e7ef720ddb7",
-        "x-pp-git-version": "56959afe3598d81a9919c57d387e8acda71bad80"
+        "traceparent": "00-000000000000000046ac238b662a201d-41c6e080bda93a37-01",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+        "x-pp-client-id": "73dd656c-09f0-418f-a44a-3381a49569b6",
+        "x-pp-git-version": "a573203488ab6d3c213fac0943bab8584f465dd5"
     }
 
     # Use the exact same date and format from the curl command
     params = {
-        "from_datetime": "2025-05-19 00:00:00",
-        "to_datetime": "2025-05-19 05:00:00",
+        "from_datetime": "2025-07-16 00:00:00",
+        "to_datetime": "2025-07-16 08:00:00",
         "network_code": "PRR"
     }
 
