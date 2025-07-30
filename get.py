@@ -15,17 +15,17 @@ def get_campaign_data(start_date, end_date):
     Function to fetch campaign data for a specific date range
     """
     url = "https://api.pubplus.com/api/campaigns_report"
-
+    
     params = {
         "from_datetime": start_date,
         "to_datetime": end_date,
         "network_code": "PRR"
     }
-
+    
     headers = {
         "accept": "application/json, text/plain, */*",
         "accept-language": "en",
-        "authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NTI2MTY3MDgsImV4cCI6MTc1MzgyNjMwOCwiYXV0aF9zZWNyZXQiOiI1ZTUxMzAwOTQwNzRlOTEyY2FiYTNiNmE5MzU5MTYwN2ZlNmJlMGY0ZWQ2ZTUxMzE1ZTA2ODliOTYyZDM2NjEwNGM3YjEyZmY5MmIyZmRkNTg2MDUwYjdmNTUxY2I4MTc2NWMzN2FkYWIwNTU4N2U1MWZjNWJmZTJjZGRiMzhhOSJ9.fQ-hK_vltvawZHVDvAKOgP4ocdGWQhbwq9d1wiQmtAs",
+        "authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NTMwODI5MTEsImV4cCI6MTc1NDI5MjUxMSwiYXV0aF9zZWNyZXQiOiIyMTAzODcyMGFkYjBmZTFhMTY5ZGIyODg0NmQ2OWIwYTIxMGYwOTYxMjY4NmM3M2Y5YzMwNWUxMGU0NDNjMDIzNjc1MzVkYTM3NzVkM2JjN2RkYTM0MTk1OWM1ODk1Yjc0ODgxMWM1MmI5MDQ2YjI1YjE4NGM0OTlhNjBlYTEwMiJ9.JSBQV22O8oAVotWQYLpm9C9fZKY29vZOhdV0z0rUhRM",
         "origin": "https://app.pubplus.com",
         "priority": "u=1, i",
         "referer": "https://app.pubplus.com/",
@@ -35,10 +35,10 @@ def get_campaign_data(start_date, end_date):
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-site",
-        "traceparent": "00-000000000000000046ac238b662a201d-41c6e080bda93a37-01",
+        "traceparent": "00-00000000000000007a7498c26c26e1d7-2fa5785010c2bf83-01",
         "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-        "x-pp-client-id": "73dd656c-09f0-418f-a44a-3381a49569b6",
-        "x-pp-git-version": "a573203488ab6d3c213fac0943bab8584f465dd5"
+        "x-pp-client-id": "832b24e7-4224-4ca9-84c5-74e98aacf469",
+        "x-pp-git-version": "c8fe6405f550b9d6abf3047ebde250981f672f0b"
     }
 
     try:

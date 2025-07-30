@@ -15,11 +15,10 @@ def main():
         
         # Set environment variable to help with encoding issues
         os.environ["PYTHONIOENCODING"] = "utf-8"
-        
-        # Set all required headers from the curl command
-        os.environ["PUBPLUS_AUTH_TOKEN"] = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NDc2MzYzNzgsImV4cCI6MTc0ODg0NTk3OCwiYXV0aF9zZWNyZXQiOiIxOTNlMzRkMTdiY2I0ZmMzYzBjYjc4NzE4NzliODQyZWY0YzU3Mzk1OGI3MTExYzA4NDRiZjA5MmEyYTZmYjIxNTc4NjJhYWQxYmRiNTAyMzc4NjAxNTAwOWM2ZTJjYTU5NTcwY2M3MjRhNDE2YTg3YjM2NDdlZDE3Mjk5NzI5NCJ9.PEhdULJAmfST_wg_Pgj5CnlHV9t52f9lg2OF9e70Rro"
-        os.environ["PUBPLUS_CLIENT_ID"] = "7f156802-18bf-47f1-a8da-719a625fcaca"
-        os.environ["PUBPLUS_GIT_VERSION"] = "c6986e576d509b7e5a53299009ff5792a3455863"
+          # Set all required headers from the curl command
+        os.environ["PUBPLUS_AUTH_TOKEN"] = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NTMwODI5MTEsImV4cCI6MTc1NDI5MjUxMSwiYXV0aF9zZWNyZXQiOiIyMTAzODcyMGFkYjBmZTFhMTY5ZGIyODg0NmQ2OWIwYTIxMGYwOTYxMjY4NmM3M2Y5YzMwNWUxMGU0NDNjMDIzNjc1MzVkYTM3NzVkM2JjN2RkYTM0MTk1OWM1ODk1Yjc0ODgxMWM1MmI5MDQ2YjI1YjE4NGM0OTlhNjBlYTEwMiJ9.JSBQV22O8oAVotWQYLpm9C9fZKY29vZOhdV0z0rUhRM"
+        os.environ["PUBPLUS_CLIENT_ID"] = "832b24e7-4224-4ca9-84c5-74e98aacf469"
+        os.environ["PUBPLUS_GIT_VERSION"] = "c8fe6405f550b9d6abf3047ebde250981f672f0b"
         os.environ["PUBPLUS_ACCEPT"] = "application/json, text/plain, */*"
         os.environ["PUBPLUS_ORIGIN"] = "https://app.pubplus.com"
         os.environ["PUBPLUS_REFERER"] = "https://app.pubplus.com/"
