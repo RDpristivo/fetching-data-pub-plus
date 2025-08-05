@@ -12,13 +12,13 @@ def main():
         main_script = os.path.join(dir_path, "main.py")
         
         print("Starting script with error handling wrapper...")
-        
-        # Set environment variable to help with encoding issues
+          # Set environment variable to help with encoding issues
         os.environ["PYTHONIOENCODING"] = "utf-8"
-          # Set all required headers from the curl command
-        os.environ["PUBPLUS_AUTH_TOKEN"] = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NTMwODI5MTEsImV4cCI6MTc1NDI5MjUxMSwiYXV0aF9zZWNyZXQiOiIyMTAzODcyMGFkYjBmZTFhMTY5ZGIyODg0NmQ2OWIwYTIxMGYwOTYxMjY4NmM3M2Y5YzMwNWUxMGU0NDNjMDIzNjc1MzVkYTM3NzVkM2JjN2RkYTM0MTk1OWM1ODk1Yjc0ODgxMWM1MmI5MDQ2YjI1YjE4NGM0OTlhNjBlYTEwMiJ9.JSBQV22O8oAVotWQYLpm9C9fZKY29vZOhdV0z0rUhRM"
-        os.environ["PUBPLUS_CLIENT_ID"] = "832b24e7-4224-4ca9-84c5-74e98aacf469"
-        os.environ["PUBPLUS_GIT_VERSION"] = "c8fe6405f550b9d6abf3047ebde250981f672f0b"
+        
+        # Set all required headers from the curl command
+        os.environ["PUBPLUS_AUTH_TOKEN"] = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NTQyOTM3MzUsImV4cCI6MTc1NTUwMzMzNSwiYXV0aF9zZWNyZXQiOiJmYzdmNzkyYjA0NGFlYTljYWYxZTc2YmE2MzE4M2FmNTNjMDY4NTcxMzU1MjFmNDE5ZDQ1ZDVjNzVkYmNmNDU3N2Y3NjA4MDFiYzc0MTBmMjUxMmY2MGFhYmIwY2FhZjQ2NDAyYmJlMmRlZjQ1MTkwNWQ4MDM1Yjg4Y2IzM2IyNSJ9.J_3WoUeT3Vpff_S4Da5YKji4uD_EwxV5TIzx7a6D7OU"
+        os.environ["PUBPLUS_CLIENT_ID"] = "9eb52ef8-6cf4-4b97-baeb-3b0180c54444"
+        os.environ["PUBPLUS_GIT_VERSION"] = "037be91812f50e7157f7c7c23780b81066971760"
         os.environ["PUBPLUS_ACCEPT"] = "application/json, text/plain, */*"
         os.environ["PUBPLUS_ORIGIN"] = "https://app.pubplus.com"
         os.environ["PUBPLUS_REFERER"] = "https://app.pubplus.com/"

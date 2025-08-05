@@ -25,7 +25,7 @@ def get_campaign_data(start_date, end_date):
     headers = {
         "accept": "application/json, text/plain, */*",
         "accept-language": "en",
-        "authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NTMwODI5MTEsImV4cCI6MTc1NDI5MjUxMSwiYXV0aF9zZWNyZXQiOiIyMTAzODcyMGFkYjBmZTFhMTY5ZGIyODg0NmQ2OWIwYTIxMGYwOTYxMjY4NmM3M2Y5YzMwNWUxMGU0NDNjMDIzNjc1MzVkYTM3NzVkM2JjN2RkYTM0MTk1OWM1ODk1Yjc0ODgxMWM1MmI5MDQ2YjI1YjE4NGM0OTlhNjBlYTEwMiJ9.JSBQV22O8oAVotWQYLpm9C9fZKY29vZOhdV0z0rUhRM",
+        "authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NTQyOTM3MzUsImV4cCI6MTc1NTUwMzMzNSwiYXV0aF9zZWNyZXQiOiJmYzdmNzkyYjA0NGFlYTljYWYxZTc2YmE2MzE4M2FmNTNjMDY4NTcxMzU1MjFmNDE5ZDQ1ZDVjNzVkYmNmNDU3N2Y3NjA4MDFiYzc0MTBmMjUxMmY2MGFhYmIwY2FhZjQ2NDAyYmJlMmRlZjQ1MTkwNWQ4MDM1Yjg4Y2IzM2IyNSJ9.J_3WoUeT3Vpff_S4Da5YKji4uD_EwxV5TIzx7a6D7OU",
         "origin": "https://app.pubplus.com",
         "priority": "u=1, i",
         "referer": "https://app.pubplus.com/",
@@ -33,12 +33,11 @@ def get_campaign_data(start_date, end_date):
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"macOS"',
         "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-site",
-        "traceparent": "00-00000000000000007a7498c26c26e1d7-2fa5785010c2bf83-01",
+        "sec-fetch-mode": "cors",        "sec-fetch-site": "same-site",
+        "traceparent": "00-00000000000000004b419c3ad05111e9-47b52f423bc09a21-01",
         "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-        "x-pp-client-id": "832b24e7-4224-4ca9-84c5-74e98aacf469",
-        "x-pp-git-version": "c8fe6405f550b9d6abf3047ebde250981f672f0b"
+        "x-pp-client-id": "9eb52ef8-6cf4-4b97-baeb-3b0180c54444",
+        "x-pp-git-version": "037be91812f50e7157f7c7c23780b81066971760"
     }
 
     try:
